@@ -1,6 +1,6 @@
 // Configuration
 let tasks = [];
-let hearts = 0; // Starting with some hearts as a gift
+let hearts = 0; // Starting with 0 hearts
 let currentStreak = 0;
 let taskToDelete = null; // Store the task ID to delete
 let bestStreak = 0;
@@ -527,11 +527,21 @@ function setupEventListeners() {
             return;
         }
 
+        const reminderInput = document.getElementById('task-reminder').value;
+        let reminderValue = '';
+        
+        // Convert reminder to proper format if provided
+        if (reminderInput) {
+            // HTML datetime-local gives format: "YYYY-MM-DDTHH:MM"
+            // Convert to: "YYYY-MM-DDTHH:MM:00" for consistency
+            reminderValue = reminderInput + ':00';
+        }
+
         const taskData = {
             name: document.getElementById('task-name').value,
             subject: document.getElementById('task-subject').value,
             due: document.getElementById('task-due').value,
-            reminder: document.getElementById('task-reminder').value,
+            reminder: reminderValue,
             priority: selectedPriority.dataset.priority,
             completed: false
         };
@@ -1223,7 +1233,7 @@ setupTabs = function() {
     }
 };
 
-// Notifications
+// Notifications - FIXED VERSION
 function requestNotificationPermission() {
     if ('Notification' in window && Notification.permission === 'default') {
         const container = document.getElementById('tasks-container');
@@ -1249,12 +1259,36 @@ function enableNotifications() {
 }
 
 function checkReminders() {
+    console.log('🔔 Checking reminders at:', new Date().toLocaleTimeString());
+    
     if ('Notification' in window && Notification.permission === 'granted') {
         const now = new Date();
+        console.log('✅ Notifications enabled, current time:', now.toLocaleString());
+        
+        let foundReminders = false;
+        
         tasks.forEach(task => {
-            if (task.reminder && !task.completed && !task.notified) {
-                const reminderTime = new Date(task.reminder);
-                if (now >= reminderTime && now - reminderTime < 60000) {
+            if (task.reminder && task.reminder.trim() !== '' && !task.completed && !task.notified) {
+                // Convert reminder to proper date
+                let reminderTime;
+                if (task.reminder.length === 16) { // Format: "YYYY-MM-DDTHH:MM"
+                    reminderTime = new Date(task.reminder + ':00');
+                } else {
+                    reminderTime = new Date(task.reminder);
+                }
+                
+                // Debug log
+                console.log(`Task: "${task.name}"`);
+                console.log(`Reminder time: ${reminderTime.toLocaleString()}`);
+                console.log(`Now: ${now.toLocaleString()}`);
+                console.log(`Time difference (seconds): ${Math.floor((now - reminderTime) / 1000)}`);
+                
+                // Check if reminder time is within the last minute
+                const timeDiff = now - reminderTime;
+                if (timeDiff >= 0 && timeDiff < 60000) { // Within 1 minute after reminder
+                    console.log('🎯 SHOWING NOTIFICATION NOW!');
+                    foundReminders = true;
+                    
                     const messages = [
                         `💕 Time to work on: ${task.name}`,
                         `🌸 Gentle reminder: ${task.name}`,
@@ -1265,7 +1299,8 @@ function checkReminders() {
                     
                     new Notification('Cozy Study Reminder', {
                         body: message,
-                        icon: '🌸'
+                        icon: '🌸',
+                        requireInteraction: true
                     });
                     
                     task.notified = true;
@@ -1273,6 +1308,31 @@ function checkReminders() {
                 }
             }
         });
+        
+        if (!foundReminders) {
+            console.log('📭 No reminders due right now');
+        }
+    } else {
+        console.log('❌ Notifications not available or not granted');
+        console.log('Permission status:', Notification.permission);
+    }
+}
+
+// Test function for notifications (add this to test)
+function testNotificationNow() {
+    console.log('🔧 Testing notification system...');
+    
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('Test Notification', {
+            body: 'This is a test notification! If you see this, notifications work! ✅',
+            icon: '🌸',
+            requireInteraction: true
+        });
+        console.log('Test notification sent!');
+        showToast('Test notification sent! Check your notifications. ✅');
+    } else {
+        console.log('Notification permission not granted');
+        showToast('Please enable notifications first! ⚠️');
     }
 }
 
