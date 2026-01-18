@@ -1,13 +1,13 @@
 // Configuration
 let tasks = [];
-let hearts = 0; // Starting with 0 hearts
+let hearts = 0;
 let currentStreak = 0;
-let taskToDelete = null; // Store the task ID to delete
+let taskToDelete = null;
 let bestStreak = 0;
 let lastCompletionDate = null;
 let editingTaskId = null;
 let unlockedRewards = [];
-let customSubjects = []; // Array to store custom subjects
+let customSubjects = [];
 let settings = {
     userName: 'My Love',
     theme: 'pink',
@@ -18,21 +18,25 @@ let timer = {
     minutes: 25,
     seconds: 0,
     isRunning: false,
-    mode: 'Focus', // Focus, Break, Long Break
+    mode: 'Focus',
     interval: null
 };
 let studyStats = {
     totalTasks: 0,
     completedTasks: 0,
-    studyTime: 0, // in minutes
+    studyTime: 0,
     subjects: {}
 };
 
-// Updated priority emojis to stars
+// Check if app is installed as PWA
+let isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+            window.navigator.standalone ||
+            document.referrer.includes('android-app://');
+
 const priorityEmojis = {
-    low: '🌟',      // 1 star
-    medium: '🌟🌟',  // 2 stars
-    high: '🌟🌟🌟'   // 3 stars
+    low: '🌟',
+    medium: '🌟🌟',
+    high: '🌟🌟🌟'
 };
 
 const subjectColors = {
@@ -99,7 +103,6 @@ const realRewards = [
     }
 ];
 
-// Love messages from you (Edit these with your own messages!)
 const secretMessages = [
     "You are the most amazing person I know. Watching you study so hard inspires me every day. I'm so proud of you! 💕",
     "Every time you complete a task, remember how capable and brilliant you are. I believe in you more than you know! ✨",
@@ -136,9 +139,13 @@ const encouragementMessages = [
 
 // Initialize the app
 function init() {
-    // Check browser support
-    if (!('Notification' in window)) {
-        console.warn('This browser does not support desktop notifications');
+    console.log('Initializing Cozy Study Companion...');
+    console.log('Is PWA:', isPWA);
+    console.log('Service Worker support:', 'serviceWorker' in navigator);
+    
+    // Register Service Worker if supported
+    if ('serviceWorker' in navigator) {
+        registerServiceWorker();
     }
     
     loadData();
@@ -155,20 +162,96 @@ function init() {
     setupTabs();
     setupScheduleTabs();
     setupEventListeners();
-    requestNotificationPermission();
-    checkReminders();
     
-    // Check reminders every minute
-    setInterval(checkReminders, 60000);
+    // Show PWA install prompt
+    showPWAInstallPrompt();
+    
+    // Request notification permission
+    setTimeout(() => {
+        requestNotificationPermission();
+    }, 1000);
+    
+    // Start reminder checking
+    checkReminders();
+    setInterval(checkReminders, 60000); // Check every minute
     
     // Show loading screen for 2 seconds
     setTimeout(() => {
         document.getElementById('loading-screen').style.display = 'none';
         showToast("Welcome back, my love! 💕");
+        
+        // Show PWA instructions if on mobile
+        if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && !isPWA) {
+            setTimeout(() => {
+                showToast("For best experience, install as app! 📱");
+            }, 3000);
+        }
     }, 2000);
     
-    // Show daily affirmation
     showDailyAffirmation();
+}
+
+// Register Service Worker
+function registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+            .then(registration => {
+                console.log('Service Worker registered successfully:', registration);
+                
+                // Check for periodic sync support
+                if ('periodicSync' in registration) {
+                    registration.periodicSync.register('check-reminders', {
+                        minInterval: 15 * 60 * 1000 // 15 minutes
+                    }).then(() => {
+                        console.log('Periodic sync registered');
+                    });
+                }
+                
+                return registration;
+            })
+            .catch(error => {
+                console.log('Service Worker registration failed:', error);
+            });
+    }
+}
+
+// Show PWA Install Prompt
+let deferredPrompt;
+function showPWAInstallPrompt() {
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        
+        // Show install button after 5 seconds
+        setTimeout(() => {
+            if (deferredPrompt && !isPWA) {
+                const installPrompt = document.createElement('div');
+                installPrompt.className = 'notification-prompt';
+                installPrompt.innerHTML = `
+                    <p>📱 Install as app for better notifications?</p>
+                    <button class="btn btn-primary" onclick="installPWA()">Install App</button>
+                    <button class="btn btn-secondary" onclick="this.parentElement.remove()">Not Now</button>
+                `;
+                const container = document.getElementById('tasks-container');
+                if (container) {
+                    container.insertBefore(installPrompt, container.firstChild);
+                }
+            }
+        }, 5000);
+    });
+}
+
+function installPWA() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+                console.log('User accepted PWA installation');
+                showToast("App installed! Notifications will work better now 📱");
+            }
+            deferredPrompt = null;
+        });
+    }
 }
 
 // Data Management
@@ -187,19 +270,16 @@ function loadData() {
         customSubjects = parsed.customSubjects || [];
     }
     
-    // Populate custom subjects in dropdown
     populateCustomSubjects();
     updateStudyStats();
 }
 
 function populateCustomSubjects() {
     const select = document.getElementById('task-subject');
-    // Remove existing custom subjects (except the first 6 default ones)
     for (let i = select.options.length - 1; i >= 6; i--) {
         select.remove(i);
     }
     
-    // Add custom subjects
     customSubjects.forEach(subject => {
         const option = document.createElement('option');
         option.value = subject;
@@ -218,7 +298,7 @@ function saveData() {
         unlockedRewards,
         settings,
         studyStats,
-        customSubjects  // Save custom subjects
+        customSubjects
     };
     localStorage.setItem('cozyStudyData', JSON.stringify(data));
 }
@@ -232,7 +312,6 @@ function showAddSubject() {
 function addNewSubject() {
     const newSubject = document.getElementById('new-subject').value.trim();
     if (newSubject) {
-        // Check if subject already exists
         const select = document.getElementById('task-subject');
         const existingOption = Array.from(select.options).find(option => 
             option.value.toLowerCase() === newSubject.toLowerCase()
@@ -246,37 +325,30 @@ function addNewSubject() {
             return;
         }
         
-        // Add to custom subjects if not already there
         if (!customSubjects.includes(newSubject)) {
             customSubjects.push(newSubject);
         }
         
-        // Add to dropdown
         const option = document.createElement('option');
         option.value = newSubject;
         option.textContent = newSubject + ' 📝';
         select.appendChild(option);
         
-        // Select the new subject
         select.value = newSubject;
         
-        // Hide the input and clear it
         document.getElementById('add-subject-input').style.display = 'none';
         document.getElementById('new-subject').value = '';
         
-        // Save to localStorage
         saveData();
         
         showToast(`Added new subject: ${newSubject} 📚`);
     }
 }
 
-// Get subject color with fallback for custom subjects
 function getSubjectColor(subject) {
     return subjectColors[subject] || '#999';
 }
 
-// Get subject emoji with fallback for custom subjects
 function getSubjectEmoji(subject) {
     return subjectEmojis[subject] || '📝';
 }
@@ -344,24 +416,20 @@ function setTimer(minutes, mode) {
 function updateTimer() {
     if (timer.seconds === 0) {
         if (timer.minutes === 0) {
-            // Timer completed
             clearInterval(timer.interval);
             timer.isRunning = false;
             document.getElementById('timer-start-btn').textContent = 'Start';
             
-            // Add study time to stats
             if (timer.mode === 'Focus') {
                 studyStats.studyTime += 25;
-                hearts += 10; // Reward for completing a study session
+                hearts += 10;
                 updateHeartsDisplay();
                 saveData();
                 renderStats();
                 
-                // Celebration
                 celebrate();
                 showToast("Great focus session! You earned 10 hearts! 💖");
                 
-                // Ask for break
                 if (confirm("Time for a 5-minute break? You've earned it! 🌸")) {
                     setTimer(5, 'Break');
                     startTimer();
@@ -381,13 +449,10 @@ function updateTimer() {
 }
 
 function updateTimerDisplay() {
-    // Update modal display
     document.getElementById('timer-minutes').textContent = 
         timer.minutes.toString().padStart(2, '0');
     document.getElementById('timer-seconds').textContent = 
         timer.seconds.toString().padStart(2, '0');
-    
-    // Update nav timer display
     updateNavTimer();
 }
 
@@ -408,12 +473,10 @@ function closeTimerModal() {
 }
 
 function openSettings() {
-    // Load current settings
     document.getElementById('user-name').value = settings.userName;
     document.getElementById('daily-goal').value = settings.dailyGoal;
     document.getElementById('study-sounds').value = settings.studySound;
     
-    // Set active theme
     document.querySelectorAll('.theme-option').forEach(option => {
         option.classList.remove('active');
     });
@@ -431,9 +494,7 @@ function saveSettings() {
     settings.dailyGoal = parseInt(document.getElementById('daily-goal').value) || 3;
     settings.studySound = document.getElementById('study-sounds').value;
     
-    // Update welcome message
     updateWelcomeMessage();
-    
     saveData();
     closeSettings();
     showToast("Settings saved! ✨");
@@ -443,13 +504,11 @@ function showSecretMessage() {
     const randomMessage = secretMessages[Math.floor(Math.random() * secretMessages.length)];
     document.getElementById('secret-message-text').textContent = randomMessage;
     
-    // Close settings modal first
     closeSettings();
     
-    // Then show secret message after a small delay for smooth transition
     setTimeout(() => {
         document.getElementById('secret-modal').classList.add('active');
-    }, 300); // 300ms delay for smooth transition
+    }, 300);
 }
 
 function closeSecretModal() {
@@ -487,7 +546,6 @@ function openTaskModal(taskId = null) {
     const form = document.getElementById('task-form');
     editingTaskId = taskId;
 
-    // Hide any open add subject input
     document.getElementById('add-subject-input').style.display = 'none';
     document.getElementById('new-subject').value = '';
 
@@ -512,7 +570,6 @@ function openTaskModal(taskId = null) {
 function closeTaskModal() {
     document.getElementById('task-modal').classList.remove('active');
     editingTaskId = null;
-    // Hide add subject input when closing modal
     document.getElementById('add-subject-input').style.display = 'none';
     document.getElementById('new-subject').value = '';
 }
@@ -524,7 +581,6 @@ function selectPriority(priority) {
 
 // Event Listeners
 function setupEventListeners() {
-    // Task form submission
     document.getElementById('task-form').addEventListener('submit', (e) => {
         e.preventDefault();
         
@@ -537,10 +593,7 @@ function setupEventListeners() {
         const reminderInput = document.getElementById('task-reminder').value;
         let reminderValue = '';
         
-        // Convert reminder to proper format if provided
         if (reminderInput) {
-            // HTML datetime-local gives format: "YYYY-MM-DDTHH:MM"
-            // Convert to: "YYYY-MM-DDTHH:MM:00" for consistency
             reminderValue = reminderInput + ':00';
         }
 
@@ -571,14 +624,12 @@ function setupEventListeners() {
         closeTaskModal();
     });
 
-    // Quick task input (press Enter)
     document.getElementById('quick-task-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             addQuickTask();
         }
     });
 
-    // Close add subject input when clicking outside
     document.addEventListener('click', (e) => {
         const addSubjectInput = document.getElementById('add-subject-input');
         const addSubjectBtn = document.querySelector('.add-subject-btn');
@@ -621,7 +672,6 @@ function updateTodayProgress() {
     const today = new Date();
     const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     
-    // Only count tasks due TODAY
     const todayTasks = tasks.filter(t => {
         const taskDue = new Date(t.due);
         const taskDueOnly = new Date(taskDue.getFullYear(), taskDue.getMonth(), taskDue.getDate());
@@ -635,23 +685,21 @@ function updateTodayProgress() {
 function renderTasks() {
     const container = document.getElementById('tasks-container');
     
-    // Get today's date at midnight
     const today = new Date();
     const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     
-    // Separate tasks
     const todayTasks = tasks.filter(t => {
-        if (t.completed) return false; // Don't show completed tasks in today's section
+        if (t.completed) return false;
         const taskDue = new Date(t.due);
         const taskDueOnly = new Date(taskDue.getFullYear(), taskDue.getMonth(), taskDue.getDate());
         return taskDueOnly.getTime() === todayOnly.getTime();
     });
     
     const upcomingTasks = tasks.filter(t => {
-        if (t.completed) return false; // Don't show completed tasks in upcoming section
+        if (t.completed) return false;
         const taskDue = new Date(t.due);
         const taskDueOnly = new Date(taskDue.getFullYear(), taskDue.getMonth(), taskDue.getDate());
-        return taskDueOnly.getTime() > todayOnly.getTime(); // Only FUTURE dates
+        return taskDueOnly.getTime() > todayOnly.getTime();
     });
     
     const completedTasks = tasks.filter(t => t.completed).sort((a, b) => new Date(b.due) - new Date(a.due));
@@ -668,7 +716,6 @@ function renderTasks() {
 
     let html = '';
 
-    // Show Today's Tasks
     if (todayTasks.length > 0) {
         html += '<div class="section-title">Today\'s Tasks 📅</div>';
         todayTasks.forEach(task => {
@@ -676,7 +723,6 @@ function renderTasks() {
         });
     }
 
-    // Show Upcoming Tasks (future dates)
     if (upcomingTasks.length > 0) {
         html += '<div class="section-title" style="margin-top: 20px;">Upcoming Tasks 🔮</div>';
         upcomingTasks.sort((a, b) => new Date(a.due) - new Date(b.due)).forEach(task => {
@@ -684,7 +730,6 @@ function renderTasks() {
         });
     }
 
-    // Show Completed Tasks
     if (completedTasks.length > 0) {
         html += '<div class="section-title" style="margin-top: 20px;">Completed ✨</div>';
         completedTasks.forEach(task => {
@@ -694,34 +739,6 @@ function renderTasks() {
 
     container.innerHTML = html;
     updateTodayProgress();
-}
-
-// Delete Modal Functions
-function openDeleteModal(taskId) {
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-        taskToDelete = taskId;
-        document.getElementById('delete-task-name').textContent = `"${task.name}"`;
-        document.getElementById('delete-modal').classList.add('active');
-    }
-}
-
-function closeDeleteModal() {
-    document.getElementById('delete-modal').classList.remove('active');
-    taskToDelete = null;
-}
-
-function confirmDelete() {
-    if (taskToDelete) {
-        tasks = tasks.filter(t => t.id !== taskToDelete);
-        saveData();
-        updateStudyStats();
-        renderTasks();
-        renderSchedule();
-        renderStats();
-        showToast("Task deleted 📭");
-        closeDeleteModal();
-    }
 }
 
 function renderTaskCard(task) {
@@ -770,15 +787,30 @@ function toggleTask(id) {
     renderStats();
 }
 
-function deleteTask(id) {
-    if (confirm('Are you sure you want to delete this task? 🥺')) {
-        tasks = tasks.filter(t => t.id !== id);
+function openDeleteModal(taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+        taskToDelete = taskId;
+        document.getElementById('delete-task-name').textContent = `"${task.name}"`;
+        document.getElementById('delete-modal').classList.add('active');
+    }
+}
+
+function closeDeleteModal() {
+    document.getElementById('delete-modal').classList.remove('active');
+    taskToDelete = null;
+}
+
+function confirmDelete() {
+    if (taskToDelete) {
+        tasks = tasks.filter(t => t.id !== taskToDelete);
         saveData();
         updateStudyStats();
         renderTasks();
         renderSchedule();
         renderStats();
         showToast("Task deleted 📭");
+        closeDeleteModal();
     }
 }
 
@@ -862,7 +894,6 @@ function updateStudyStats() {
     studyStats.totalTasks = tasks.length;
     studyStats.completedTasks = tasks.filter(t => t.completed).length;
     
-    // Update subject breakdown
     studyStats.subjects = {};
     tasks.forEach(task => {
         if (!studyStats.subjects[task.subject]) {
@@ -878,7 +909,6 @@ function updateStudyStats() {
 }
 
 function renderStats() {
-    // Update stat cards
     document.getElementById('total-tasks').textContent = studyStats.totalTasks;
     document.getElementById('completed-tasks').textContent = studyStats.completedTasks;
     document.getElementById('study-time').textContent = `${Math.floor(studyStats.studyTime / 60)}h`;
@@ -888,7 +918,6 @@ function renderStats() {
         : 0;
     document.getElementById('completion-rate').textContent = `${completionRate}%`;
     
-    // Update subject chart
     renderSubjectChart();
 }
 
@@ -1023,6 +1052,13 @@ function setupTabs() {
             document.getElementById(tab.dataset.view + '-view').classList.add('active');
         });
     });
+    
+    const scheduleTab = document.querySelector('.tab[data-view="schedule"]');
+    if (scheduleTab) {
+        scheduleTab.addEventListener('click', function() {
+            goToCurrentMonth();
+        });
+    }
 }
 
 function setupScheduleTabs() {
@@ -1045,10 +1081,8 @@ function renderSchedule() {
 }
 
 function changeMonth(direction) {
-    // Update current month/year
     currentCalendarMonth += direction;
     
-    // Handle year rollover
     if (currentCalendarMonth < 0) {
         currentCalendarMonth = 11;
         currentCalendarYear--;
@@ -1071,29 +1105,22 @@ function renderMonthlyCalendar() {
     const container = document.getElementById('monthly-calendar');
     const monthYearDisplay = document.getElementById('current-month-year');
     
-    // Update month/year display
     const date = new Date(currentCalendarYear, currentCalendarMonth, 1);
     monthYearDisplay.textContent = date.toLocaleDateString('en-US', { 
         month: 'long', 
         year: 'numeric' 
     });
     
-    // Get first day of month
     const firstDay = new Date(currentCalendarYear, currentCalendarMonth, 1);
-    // Get last day of month
     const lastDay = new Date(currentCalendarYear, currentCalendarMonth + 1, 0);
-    // Get number of days in month
     const daysInMonth = lastDay.getDate();
-    // Get day of week for first day (0 = Sunday, 1 = Monday, etc.)
     const firstDayOfWeek = firstDay.getDay();
     
-    // Get today's date for comparison
     const today = new Date();
     const todayYear = today.getFullYear();
     const todayMonth = today.getMonth();
     const todayDate = today.getDate();
     
-    // Create calendar header with weekdays
     let html = `
         <div class="weekday-header">
             <div>Sun</div>
@@ -1107,28 +1134,23 @@ function renderMonthlyCalendar() {
         <div class="calendar-grid">
     `;
     
-    // Add empty cells for days before the first day of month
     for (let i = 0; i < firstDayOfWeek; i++) {
         html += '<div class="calendar-day empty"></div>';
     }
     
-    // Add cells for each day of the month
     for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(currentCalendarYear, currentCalendarMonth, day);
         const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
         
-        // Check if this is today
         const isToday = (currentCalendarYear === todayYear && 
                         currentCalendarMonth === todayMonth && 
                         day === todayDate);
         
-        // Check if this is current month
         const isCurrentMonth = (currentCalendarYear === todayYear && 
                                currentCalendarMonth === todayMonth);
         
-        // Get tasks for this day
         const dayTasks = tasks.filter(t => {
-            if (t.completed) return false; // Don't show completed tasks
+            if (t.completed) return false;
             
             const taskDue = new Date(t.due);
             const taskDueOnly = new Date(taskDue.getFullYear(), taskDue.getMonth(), taskDue.getDate());
@@ -1153,7 +1175,6 @@ function renderMonthlyCalendar() {
         `;
     }
     
-    // Add empty cells to complete the last row (if needed)
     const totalCells = firstDayOfWeek + daysInMonth;
     const remainingCells = 7 - (totalCells % 7);
     
@@ -1163,11 +1184,10 @@ function renderMonthlyCalendar() {
         }
     }
     
-    html += '</div>'; // Close calendar-grid
+    html += '</div>';
     
     container.innerHTML = html;
     
-    // Add click event to each day
     document.querySelectorAll('.calendar-day.has-tasks').forEach(dayElement => {
         dayElement.addEventListener('click', function() {
             const day = parseInt(this.querySelector('.day-number').textContent);
@@ -1180,7 +1200,6 @@ function renderMonthlyCalendar() {
 function showDayTasks(date) {
     const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     
-    // Get tasks for this specific day
     const dayTasks = tasks.filter(t => {
         if (t.completed) return false;
         
@@ -1195,7 +1214,6 @@ function showDayTasks(date) {
         return;
     }
     
-    // Create modal for day tasks
     const modalHtml = `
         <div class="modal active" id="day-tasks-modal">
             <div class="modal-content">
@@ -1212,7 +1230,6 @@ function showDayTasks(date) {
         </div>
     `;
     
-    // Add modal to body
     const modalContainer = document.createElement('div');
     modalContainer.innerHTML = modalHtml;
     document.body.appendChild(modalContainer.firstChild);
@@ -1225,69 +1242,67 @@ function closeDayTasksModal() {
     }
 }
 
-// Update the setupTabs function to call renderSchedule when Schedule tab is clicked
-const originalSetupTabs = setupTabs;
-setupTabs = function() {
-    originalSetupTabs();
-    
-    // Add click listener for schedule tab
-    const scheduleTab = document.querySelector('.tab[data-view="schedule"]');
-    if (scheduleTab) {
-        scheduleTab.addEventListener('click', function() {
-            // Reset to current month when clicking schedule tab
-            goToCurrentMonth();
-        });
-    }
-};
-
-// NOTIFICATION SYSTEM - FIXED VERSION
+// NOTIFICATION SYSTEM - UPDATED FOR PWA
 function requestNotificationPermission() {
     console.log('🔔 Requesting notification permission...');
     
-    if ('Notification' in window) {
-        console.log('✅ Notifications are supported');
-        console.log('Current permission:', Notification.permission);
-        
-        if (Notification.permission === 'default') {
-            console.log('Permission is default - showing prompt');
-            const container = document.getElementById('tasks-container');
-            if (container) {
-                const prompt = document.createElement('div');
-                prompt.className = 'notification-prompt';
-                prompt.innerHTML = `
-                    <p>💖 Get gentle reminders for your tasks?</p>
-                    <button class="btn btn-primary" onclick="enableNotifications()">Enable Reminders</button>
-                `;
-                container.insertBefore(prompt, container.firstChild);
-            }
-        } else if (Notification.permission === 'denied') {
-            console.log('🔕 Notifications were previously denied by user');
-            // Show a subtle message that notifications are disabled
-            showToast("Notifications are disabled in browser settings ⚙️");
-        } else if (Notification.permission === 'granted') {
-            console.log('✅ Notifications already enabled');
-        }
-    } else {
-        console.log('❌ This browser does not support notifications');
+    if (!('Notification' in window)) {
+        console.log('❌ Notifications not supported');
         showToast("Your browser doesn't support notifications 🌸");
+        return;
     }
+    
+    if (Notification.permission === 'granted') {
+        console.log('✅ Notifications already granted');
+        return;
+    }
+    
+    if (Notification.permission === 'denied') {
+        console.log('🔕 Notifications denied');
+        showNotificationPrompt();
+        return;
+    }
+    
+    // Permission is 'default' - ask the user
+    showNotificationPrompt();
+}
+
+function showNotificationPrompt() {
+    const container = document.getElementById('tasks-container');
+    if (!container) return;
+    
+    const prompt = document.createElement('div');
+    prompt.className = 'notification-prompt';
+    prompt.innerHTML = `
+        <p>💖 Get reminders even when the app is closed?</p>
+        <p style="font-size: 12px; color: #666;">Install as app for best experience on mobile 📱</p>
+        <button class="btn btn-primary" onclick="enableNotifications()">Enable Notifications</button>
+        <button class="btn btn-secondary" onclick="this.parentElement.remove()" style="margin-top: 5px;">Not Now</button>
+    `;
+    
+    const existingPrompt = container.querySelector('.notification-prompt');
+    if (existingPrompt) existingPrompt.remove();
+    
+    container.insertBefore(prompt, container.firstChild);
 }
 
 function enableNotifications() {
-    console.log('🎯 User clicked to enable notifications');
-    
     if ('Notification' in window) {
         Notification.requestPermission().then(permission => {
             console.log('Notification permission result:', permission);
             
             if (permission === 'granted') {
                 document.querySelector('.notification-prompt')?.remove();
-                showToast("Reminders enabled! You'll get gentle notifications 💕");
+                showToast("Notifications enabled! You'll get reminders even when app is closed 📱");
                 
-                // Immediately check for any pending reminders
-                checkReminders();
+                // If on mobile and not PWA, suggest installation
+                if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && !isPWA) {
+                    setTimeout(() => {
+                        showToast("Tip: Install as app for best notification experience! 📱");
+                    }, 2000);
+                }
             } else if (permission === 'denied') {
-                showToast("You can enable notifications in browser settings later ⚙️");
+                showToast("You can enable notifications in browser settings ⚙️");
             }
         }).catch(error => {
             console.error('Error requesting notification permission:', error);
@@ -1297,50 +1312,37 @@ function enableNotifications() {
 
 function checkReminders() {
     console.log('🔔 Checking reminders at:', new Date().toLocaleTimeString());
+    console.log('Is PWA:', isPWA);
+    console.log('Notification permission:', Notification.permission);
     
-    if (typeof Notification === 'undefined') {
-        console.log('❌ Notifications not supported in this browser');
+    if (!('Notification' in window) || Notification.permission !== 'granted') {
+        console.log('❌ Notifications not enabled');
         return;
     }
-    
-    if (Notification.permission !== 'granted') {
-        console.log('🔕 Notifications not granted by user');
-        return;
-    }
-    
-    console.log('✅ Notifications are enabled and granted');
     
     const now = new Date();
-    const nowTime = now.getTime(); // Get timestamp in milliseconds
+    const nowTime = now.getTime();
     
     console.log('Current time:', now.toLocaleString());
     
     let foundReminders = false;
-    let upcomingReminders = [];
     
     tasks.forEach((task, index) => {
         if (task.reminder && task.reminder.trim() !== '' && !task.completed) {
             try {
-                // Parse reminder time
                 let reminderTime;
                 
-                // Handle different date formats
                 if (task.reminder.includes('T') && task.reminder.length === 16) {
-                    // Format: "YYYY-MM-DDTHH:MM"
                     reminderTime = new Date(task.reminder + ':00');
                 } else if (task.reminder.includes('T') && task.reminder.length === 19) {
-                    // Format: "YYYY-MM-DDTHH:MM:SS"
                     reminderTime = new Date(task.reminder);
                 } else if (task.reminder.includes('T')) {
-                    // Try parsing as-is
                     reminderTime = new Date(task.reminder);
                 } else {
-                    // If no T, it might be just time? Try to combine with today's date
                     const todayStr = new Date().toISOString().split('T')[0];
                     reminderTime = new Date(todayStr + 'T' + task.reminder);
                 }
                 
-                // Check if reminderTime is valid
                 if (isNaN(reminderTime.getTime())) {
                     console.log(`Invalid date format for task "${task.name}": "${task.reminder}"`);
                     return;
@@ -1350,59 +1352,32 @@ function checkReminders() {
                 const timeDiff = nowTime - reminderTimestamp;
                 const timeDiffSeconds = Math.floor(timeDiff / 1000);
                 
-                // Log for debugging
                 console.log(`[${index}] "${task.name}"`);
                 console.log(`   Reminder: ${reminderTime.toLocaleString()}`);
-                console.log(`   Now: ${now.toLocaleString()}`);
-                console.log(`   Diff: ${timeDiffSeconds}s (${timeDiffSeconds > 0 ? 'past' : 'future'})`);
+                console.log(`   Diff: ${timeDiffSeconds}s`);
                 
-                // Check if it's time for the reminder (within 2 minutes window - 30 sec before to 60 sec after)
+                // Check if it's time for the reminder (within 1 minute window)
                 if (timeDiff >= -30000 && timeDiff < 60000) { 
                     console.log('   🎯 TIME FOR NOTIFICATION!');
                     foundReminders = true;
                     
-                    // Check if we already notified for this task
                     if (!task.notified) {
                         showNotificationForTask(task);
                         task.notified = true;
-                    } else {
-                        console.log('   Already notified for this task');
+                        saveData();
                     }
-                } else if (timeDiff < -30000) {
-                    // Future reminder
-                    const secondsUntil = Math.abs(timeDiffSeconds);
-                    upcomingReminders.push({
-                        task: task.name,
-                        inSeconds: secondsUntil,
-                        at: reminderTime.toLocaleTimeString()
-                    });
                 }
             } catch (error) {
                 console.error(`Error parsing reminder for task "${task.name}":`, error);
-                console.log(`Reminder value: "${task.reminder}"`);
             }
         }
     });
     
-    // Log upcoming reminders
-    if (upcomingReminders.length > 0) {
-        console.log('⏰ Upcoming reminders:');
-        upcomingReminders.forEach(r => {
-            const minutes = Math.floor(r.inSeconds / 60);
-            const seconds = r.inSeconds % 60;
-            console.log(`   "${r.task}" at ${r.at} (in ${minutes}m ${seconds}s)`);
-        });
-    }
-    
     if (!foundReminders) {
         console.log('📭 No reminders due at this moment');
     }
-    
-    // Save if any tasks were marked as notified
-    saveData();
 }
 
-// Helper function to show notification
 function showNotificationForTask(task) {
     console.log('🔄 Showing notification for task:', task.name);
     
@@ -1414,12 +1389,42 @@ function showNotificationForTask(task) {
     ];
     const message = messages[Math.floor(Math.random() * messages.length)];
     
+    // Try service worker notification first (works when app is closed)
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then(registration => {
+            registration.showNotification('Cozy Study Reminder', {
+                body: message,
+                icon: isPWA ? 'icon-192.png' : 'https://emojicdn.elk.sh/💖?size=192',
+                badge: isPWA ? 'icon-192.png' : 'https://emojicdn.elk.sh/💖?size=512',
+                tag: `reminder-${task.id}`,
+                requireInteraction: true,
+                vibrate: [200, 100, 200, 100, 200],
+                data: {
+                    taskId: task.id,
+                    taskName: task.name,
+                    url: window.location.href
+                }
+            });
+            console.log('✅ Service Worker notification sent');
+        }).catch(error => {
+            console.log('Service worker notification failed:', error);
+            showRegularNotification(task, message);
+        });
+    } else {
+        showRegularNotification(task, message);
+    }
+    
+    // Also show toast if app is open
+    showToast(`Reminder: ${task.name} ⏰`);
+}
+
+function showRegularNotification(task, message) {
     try {
         const notification = new Notification('Cozy Study Reminder', {
             body: message,
-            icon: 'https://emojicdn.elk.sh/🌸', // Using an emoji as icon
+            icon: '🌸',
             requireInteraction: true,
-            tag: `reminder-${task.id}` // Prevent duplicate notifications
+            tag: `reminder-${task.id}`
         });
         
         notification.onclick = function() {
@@ -1427,29 +1432,23 @@ function showNotificationForTask(task) {
             this.close();
         };
         
-        // Auto close after 10 seconds
         setTimeout(() => {
             notification.close();
         }, 10000);
         
-        // Also show toast
-        showToast(`Reminder: ${task.name} ⏰`);
-        
-        console.log('✅ Notification shown successfully');
+        console.log('✅ Regular notification shown');
         
     } catch (error) {
         console.error('Error showing notification:', error);
-        // Fallback to toast if notification fails
-        showToast(`Reminder: ${task.name} ⏰`);
     }
 }
 
-// Test function - you can call this from browser console
+// Test function
 function scheduleTestReminder(minutesFromNow = 1) {
     console.log(`🧪 Scheduling test reminder for ${minutesFromNow} minute(s) from now...`);
     
     const testTime = new Date(Date.now() + (minutesFromNow * 60000));
-    const reminderString = testTime.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
+    const reminderString = testTime.toISOString().slice(0, 16);
     
     const testTask = {
         id: Date.now(),
@@ -1466,13 +1465,10 @@ function scheduleTestReminder(minutesFromNow = 1) {
     saveData();
     
     console.log(`✅ Test task added!`);
-    console.log(`   Name: "${testTask.name}"`);
-    console.log(`   Reminder: ${testTime.toLocaleTimeString()}`);
-    console.log(`   Will notify in ${minutesFromNow} minute(s)`);
+    console.log(`   Will notify at: ${testTime.toLocaleTimeString()}`);
     
     showToast(`Test reminder set for ${minutesFromNow} minute(s) from now! ⏰`);
     
-    // Start countdown
     let secondsLeft = minutesFromNow * 60;
     const countdown = setInterval(() => {
         secondsLeft--;
@@ -1480,11 +1476,9 @@ function scheduleTestReminder(minutesFromNow = 1) {
             clearInterval(countdown);
             console.log('⏰ TEST REMINDER TIME!');
             checkReminders();
-        } else if (secondsLeft <= 10) {
-            console.log(`Test reminder in ${secondsLeft}s...`);
         }
     }, 1000);
 }
 
-// Initialize the app when DOM is loaded
+// Initialize the app
 document.addEventListener('DOMContentLoaded', init);
