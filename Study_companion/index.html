@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Sweetheart's Study Companion 🌸</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <!-- Loading Screen with Personal Message -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-emoji">💖</div>
+            <h2>Just for you, my love...</h2>
+            <p id="daily-message">Loading your study space...</p>
+        </div>
+    </div>
+
+    <!-- Secret Message Modal -->
+    <div id="secret-modal" class="modal secret-modal">
+        <div class="modal-content">
+            <div class="modal-header" style="color: #ff6b9d;">
+                💌 A Special Message for You
+            </div>
+            <div class="secret-message-content">
+                <div class="secret-heart">💕</div>
+                <p id="secret-message-text"></p>
+                <button class="btn btn-primary" onclick="closeSecretModal()">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sticky Navigation Bar -->
+    <nav class="sticky-nav">
+    <div class="nav-content">
+        <div class="timer-quick-access" onclick="openTimerModal()">
+            ⏰ <span id="quick-timer">25:00</span> <!-- This ID is important -->
+        </div>
+        <div class="nav-title">Study Companion</div>
+        <div class="hearts-display">
+            ❤️ <span id="hearts-count">0</span> <!-- This ID is important -->
+        </div>
+    </div>
+</nav>
+
+    <!-- Study Timer Modal -->
+    <div id="timer-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Study Timer ⏰</div>
+            <div class="timer-display">
+                <div id="timer-minutes">25</div>
+                <div>:</div>
+                <div id="timer-seconds">00</div>
+            </div>
+            <div class="timer-mode">
+                Current Mode: <span id="current-mode">Focus</span>
+            </div>
+            <div class="timer-actions">
+                <button class="btn btn-secondary" onclick="stopTimer()">Stop</button>
+                <button class="btn btn-primary" onclick="startTimer()" id="timer-start-btn">Start</button>
+                <button class="btn btn-secondary" onclick="resetTimer()">Reset</button>
+            </div>
+            <div class="timer-presets">
+                <button class="timer-preset" onclick="setTimer(25, 'Focus')">25 min Focus</button>
+                <button class="timer-preset" onclick="setTimer(5, 'Break')">5 min Break</button>
+                <button class="timer-preset" onclick="setTimer(10, 'Long Break')">10 min Break</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Settings ⚙️</div>
+            <div class="settings-content">
+                <div class="form-group">
+                    <label>Your Name</label>
+                    <input type="text" id="user-name" placeholder="Enter your name">
+                </div>
+                <div class="form-group">
+                    <label>Theme Color</label>
+                    <div class="theme-selector">
+                        <div class="theme-option" data-theme="pink" onclick="selectTheme('pink')">
+                            <div class="theme-preview pink-theme"></div>
+                            <span>Pink</span>
+                        </div>
+                        <div class="theme-option" data-theme="lavender" onclick="selectTheme('lavender')">
+                            <div class="theme-preview lavender-theme"></div>
+                            <span>Lavender</span>
+                        </div>
+                        <div class="theme-option" data-theme="ocean" onclick="selectTheme('ocean')">
+                            <div class="theme-preview ocean-theme"></div>
+                            <span>Ocean</span>
+                        </div>
+                        <div class="theme-option" data-theme="sunset" onclick="selectTheme('sunset')">
+                            <div class="theme-preview sunset-theme"></div>
+                            <span>Sunset</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Study Sounds</label>
+                    <select id="study-sounds">
+                        <option value="none">None</option>
+                        <option value="rain">Spotify ka na lang muna beh 🌧️</option>
+                        <option value="coffee">Much better pag spotify ☕</option>
+                        <option value="lofi">HAHAHAHAH 🎵</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Daily Goal</label>
+                    <input type="number" id="daily-goal" min="1" max="10" value="3" placeholder="Tasks per day">
+                </div>
+                <div class="settings-actions">
+                    <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+                    <button class="btn btn-secondary" onclick="closeSettings()">Cancel</button>
+                </div>
+                <div class="secret-section">
+                    <button class="btn secret-btn" onclick="showSecretMessage()">💖 Special Message</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <header>
+            <div class="header-top">
+                <h1 id="app-title">🌸 Study Well my Wifey!!  🌸</h1>
+                <button class="settings-btn" onclick="openSettings()">⚙️</button>
+            </div>
+            <div class="welcome-message" id="welcome-message">
+                Good morning, beautiful! Ready to study? ✨
+            </div>
+            <div class="streak-display">
+                <div class="streak-item">
+                    🔥 Streak: <span id="current-streak">0</span>
+                </div>
+                <div class="streak-item">
+                    ⭐ Best: <span id="best-streak">0</span>
+                </div>
+                <div class="streak-item">
+                    🎯 Today: <span id="today-progress">0/3</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Quick Add Task -->
+        <div class="quick-add">
+            <input type="text" id="quick-task-input" placeholder="Add a quick task...">
+            <button class="quick-add-btn" onclick="addQuickTask()">+</button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-view="tasks">Tasks 📝</button>
+            <button class="tab" data-view="schedule">Schedule 📅</button>
+            <button class="tab" data-view="rewards">Rewards 🎁</button>
+            <button class="tab" data-view="stats">Stats 📊</button>
+        </div>
+
+        <div id="tasks-view" class="view active">
+            <button class="add-task-btn" onclick="openTaskModal()">+ Add Detailed Task</button>
+            <div id="tasks-container"></div>
+        </div>
+
+        <div id="schedule-view" class="view">
+            <div class="section-title">📅 Monthly Calendar</div>
+            <div class="calendar-navigation">
+                <button class="nav-btn prev-month" onclick="changeMonth(-1)">◀</button>
+                <div id="current-month-year" class="month-year-display"></div>
+                <button class="nav-btn next-month" onclick="changeMonth(1)">▶</button>
+            </div>
+            <div id="monthly-calendar"></div>
+        </div>
+
+        <div id="rewards-view" class="view">
+            <div class="section-title">Unlock Cute Rewards! 💖</div>
+            <div class="rewards-grid" id="rewards-container"></div>
+            <div class="real-rewards-section">
+                <div class="section-title">Special Rewards from Me 💕</div>
+                <div class="rewards-grid" id="real-rewards-container"></div>
+            </div>
+        </div>
+
+        <div id="stats-view" class="view">
+            <div class="section-title">Your Study Statistics 📊</div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-emoji">📚</div>
+                    <div class="stat-value" id="total-tasks">0</div>
+                    <div class="stat-label">Total Tasks</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-emoji">✅</div>
+                    <div class="stat-value" id="completed-tasks">0</div>
+                    <div class="stat-label">Completed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-emoji">⏱️</div>
+                    <div class="stat-value" id="study-time">0h</div>
+                    <div class="stat-label">Study Time</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-emoji">🎯</div>
+                    <div class="stat-value" id="completion-rate">0%</div>
+                    <div class="stat-label">Success Rate</div>
+                </div>
+            </div>
+            <div class="encouragement-section">
+                <div class="section-title">Today's Affirmation ✨</div>
+                <div class="affirmation-card" id="daily-affirmation">
+                    You are capable of amazing things! 🌟
+                </div>
+            </div>
+            <div class="subject-breakdown">
+                <div class="section-title">Study Breakdown</div>
+                <div id="subject-chart"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="task-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" id="modal-title">Add New Task</div>
+            <form id="task-form">
+                <div class="form-group">
+                    <label>Task Name</label>
+                    <input type="text" id="task-name" required placeholder="What do you need to do?">
+                </div>
+                <div class="form-group">
+                    <label>Subject</label>
+                    <div class="subject-selector">
+                        <select id="task-subject" required>
+                            <option value="">Select subject...</option>
+                            <option value="Math">Math 📐</option>
+                            <option value="Science">Science 🔬</option>
+                            <option value="History">AP 📜</option>
+                            <option value="Language">English 🗣️</option>
+                            <option value="Art">MAPEH 🎨</option>
+                            <option value="Other">Other 📝</option>
+                        </select>
+                        <button type="button" class="add-subject-btn" onclick="showAddSubject()">+ Add New</button>
+                    </div>
+                    <div id="add-subject-input" style="display: none; margin-top: 10px;">
+                        <input type="text" id="new-subject" placeholder="Enter new subject name">
+                        <button type="button" class="btn btn-primary" onclick="addNewSubject()" style="margin-top: 5px;">Add Subject</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Due Date</label>
+                    <input type="date" id="task-due" required>
+                </div>
+                <div class="form-group">
+                    <label>Reminder Time (Optional)</label>
+                    <input type="datetime-local" id="task-reminder">
+                </div>
+                <div class="form-group">
+                    <label>Priority</label>
+                    <div class="priority-group">
+                        <div class="priority-btn" data-priority="low" onclick="selectPriority('low')">🌟 </div>
+                        <div class="priority-btn" data-priority="medium" onclick="selectPriority('medium')">🌟🌟 </div>
+                        <div class="priority-btn" data-priority="high" onclick="selectPriority('high')">🌟🌟🌟 </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeTaskModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" style="color: #ff6b9d;">⚠️ Delete Task</div>
+            <div class="delete-message-content">
+                <div class="delete-emoji">🥺</div>
+                <p id="delete-message-text">Are you sure you want to delete this task?</p>
+                <p class="delete-task-name" id="delete-task-name"></p>
+                <div class="delete-modal-actions">
+                    <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+                    <button class="btn btn-delete" onclick="confirmDelete()">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Background Music -->
+    <audio id="background-music" loop>
+        <!-- Audio will be handled by JavaScript -->
+    </audio>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "name": "My Love's Study Companion",
+  "short_name": "StudyCompanion",
+  "description": "A cozy study companion with love",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffd1dc",
+  "theme_color": "#ff9ec9",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
