@@ -1384,7 +1384,7 @@ function showNotificationForTask(task) {
     const messages = [
         `💕 Time to work on: ${task.name}`,
         `🌸 Gentle reminder: ${task.name}`,
-        `✨ You've got this! ${task.name}`,
+        `✨ Finish this babe: ${task.name}`,
         `💖 Let's do this: ${task.name}`
     ];
     const message = messages[Math.floor(Math.random() * messages.length)];
@@ -1392,7 +1392,7 @@ function showNotificationForTask(task) {
     // Try service worker notification first (works when app is closed)
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
         navigator.serviceWorker.ready.then(registration => {
-            registration.showNotification('Cozy Study Reminder', {
+            registration.showNotification('Mrs. Villanueva Gawin mo na to', {
                 body: message,
                 icon: isPWA ? 'icon-192.png' : 'https://emojicdn.elk.sh/💖?size=192',
                 badge: isPWA ? 'icon-192.png' : 'https://emojicdn.elk.sh/💖?size=512',
