@@ -515,17 +515,23 @@ function closeSecretModal() {
     document.getElementById('secret-modal').classList.remove('active');
 }
 
-// Task Management
 function addQuickTask() {
     const input = document.getElementById('quick-task-input');
     const taskName = input.value.trim();
     
     if (taskName) {
+        // Get TODAY'S date, not current date-time
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const dueDate = `${year}-${month}-${day}`;
+        
         const taskData = {
             id: Date.now(),
             name: taskName,
             subject: 'Other',
-            due: new Date().toISOString().split('T')[0],
+            due: dueDate,
             reminder: '',
             priority: 'medium',
             completed: false
@@ -537,7 +543,9 @@ function addQuickTask() {
         renderSchedule();
         renderStats();
         input.value = '';
-        showToast("Quick task added! ✅");
+        showToast("Quick task added for today! ✅");
+        
+        console.log('Quick task added with date:', dueDate);
     }
 }
 
@@ -688,6 +696,7 @@ function renderTasks() {
     const today = new Date();
     const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     
+    // Get today's tasks (not completed)
     const todayTasks = tasks.filter(t => {
         if (t.completed) return false;
         const taskDue = new Date(t.due);
@@ -695,14 +704,24 @@ function renderTasks() {
         return taskDueOnly.getTime() === todayOnly.getTime();
     });
     
+    // Get overdue tasks (not completed, due before today)
+    const overdueTasks = tasks.filter(t => {
+        if (t.completed) return false;
+        const taskDue = new Date(t.due);
+        const taskDueOnly = new Date(taskDue.getFullYear(), taskDue.getMonth(), taskDue.getDate());
+        return taskDueOnly.getTime() < todayOnly.getTime();
+    });
+    
+    // Get upcoming tasks (not completed, due after today)
     const upcomingTasks = tasks.filter(t => {
         if (t.completed) return false;
         const taskDue = new Date(t.due);
         const taskDueOnly = new Date(taskDue.getFullYear(), taskDue.getMonth(), taskDue.getDate());
         return taskDueOnly.getTime() > todayOnly.getTime();
     });
-    
-    const completedTasks = tasks.filter(t => t.completed).sort((a, b) => new Date(b.due) - new Date(a.due));
+
+    // Get completed tasks
+    const completedTasks = tasks.filter(t => t.completed);
 
     if (tasks.length === 0) {
         container.innerHTML = `
@@ -716,25 +735,49 @@ function renderTasks() {
 
     let html = '';
 
+    // Show Overdue Tasks section if there are overdue tasks
+    if (overdueTasks.length > 0) {
+        html += '<div class="section-title" style="color: #ff6b6b;">⚠️ Overdue Tasks</div>';
+        overdueTasks.sort((a, b) => new Date(a.due) - new Date(b.due)).forEach(task => {
+            html += renderTaskCard(task);
+        });
+    }
+
+    // Show Today's Tasks section if there are tasks for today
     if (todayTasks.length > 0) {
-        html += '<div class="section-title">Today\'s Tasks 📅</div>';
+        const overdueTitle = overdueTasks.length > 0 ? 'style="margin-top: 20px;"' : '';
+        html += `<div class="section-title" ${overdueTitle}>Today\'s Tasks 📅</div>`;
         todayTasks.forEach(task => {
             html += renderTaskCard(task);
         });
     }
 
+    // Show Upcoming Tasks section if there are upcoming tasks
     if (upcomingTasks.length > 0) {
-        html += '<div class="section-title" style="margin-top: 20px;">Upcoming Tasks 🔮</div>';
+        const previousTitle = (overdueTasks.length > 0 || todayTasks.length > 0) ? 'style="margin-top: 20px;"' : '';
+        html += `<div class="section-title" ${previousTitle}>Upcoming Tasks 🔮</div>`;
         upcomingTasks.sort((a, b) => new Date(a.due) - new Date(b.due)).forEach(task => {
             html += renderTaskCard(task);
         });
     }
 
+    // Show Completed section if there are completed tasks
     if (completedTasks.length > 0) {
-        html += '<div class="section-title" style="margin-top: 20px;">Completed ✨</div>';
-        completedTasks.forEach(task => {
+        const previousTitle = (overdueTasks.length > 0 || todayTasks.length > 0 || upcomingTasks.length > 0) ? 'style="margin-top: 20px;"' : '';
+        html += `<div class="section-title" ${previousTitle}>Completed ✨</div>`;
+        completedTasks.sort((a, b) => new Date(b.due) - new Date(a.due)).forEach(task => {
             html += renderTaskCard(task);
         });
+    }
+
+    // If no tasks are visible (all filtered out), show a different message
+    if (!html) {
+        html = `
+            <div class="empty-state">
+                <div class="empty-state-emoji">📅</div>
+                <p>No active tasks! Add new tasks or check completed ones 💕</p>
+            </div>
+        `;
     }
 
     container.innerHTML = html;
@@ -1443,44 +1486,8 @@ function showRegularNotification(task, message) {
     }
 }
 
-// Test function
-function scheduleTestReminder(minutesFromNow = 1) {
-    console.log(`🧪 Scheduling test reminder for ${minutesFromNow} minute(s) from now...`);
-    
-    const testTime = new Date(Date.now() + (minutesFromNow * 60000));
-    const reminderString = testTime.toISOString().slice(0, 16);
-    
-    const testTask = {
-        id: Date.now(),
-        name: `TEST TASK - ${minutesFromNow} min reminder`,
-        subject: 'Other',
-        due: new Date().toISOString().split('T')[0],
-        reminder: reminderString,
-        priority: 'medium',
-        completed: false,
-        notified: false
-    };
-    
-    tasks.push(testTask);
-    saveData();
-    
-    console.log(`✅ Test task added!`);
-    console.log(`   Will notify at: ${testTime.toLocaleTimeString()}`);
-    
-    showToast(`Test reminder set for ${minutesFromNow} minute(s) from now! ⏰`);
-    
-    let secondsLeft = minutesFromNow * 60;
-    const countdown = setInterval(() => {
-        secondsLeft--;
-        if (secondsLeft <= 0) {
-            clearInterval(countdown);
-            console.log('⏰ TEST REMINDER TIME!');
-            checkReminders();
-        }
-    }, 1000);
-}
-
 // Initialize the app
 document.addEventListener('DOMContentLoaded', init);
+
 
 
