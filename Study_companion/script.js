@@ -136,6 +136,11 @@ const encouragementMessages = [
 
 // Initialize the app
 function init() {
+    // Check browser support
+    if (!('Notification' in window)) {
+        console.warn('This browser does not support desktop notifications');
+    }
+    
     loadData();
     applyTheme(settings.theme);
     updateWelcomeMessage();
@@ -146,12 +151,14 @@ function init() {
     renderRealRewards();
     renderStats();
     updateHeartsDisplay();
-    updateTimerDisplay(); // This will update both modal and nav timer
+    updateTimerDisplay();
     setupTabs();
     setupScheduleTabs();
     setupEventListeners();
     requestNotificationPermission();
     checkReminders();
+    
+    // Check reminders every minute
     setInterval(checkReminders, 60000);
     
     // Show loading screen for 2 seconds
@@ -1233,27 +1240,57 @@ setupTabs = function() {
     }
 };
 
-// Notifications - FIXED VERSION
+// NOTIFICATION SYSTEM - FIXED VERSION
 function requestNotificationPermission() {
-    if ('Notification' in window && Notification.permission === 'default') {
-        const container = document.getElementById('tasks-container');
-        const prompt = document.createElement('div');
-        prompt.className = 'notification-prompt';
-        prompt.innerHTML = `
-            <p>💖 Get gentle reminders for your tasks?</p>
-            <button class="btn btn-primary" onclick="enableNotifications()">Enable Reminders</button>
-        `;
-        container.insertBefore(prompt, container.firstChild);
+    console.log('🔔 Requesting notification permission...');
+    
+    if ('Notification' in window) {
+        console.log('✅ Notifications are supported');
+        console.log('Current permission:', Notification.permission);
+        
+        if (Notification.permission === 'default') {
+            console.log('Permission is default - showing prompt');
+            const container = document.getElementById('tasks-container');
+            if (container) {
+                const prompt = document.createElement('div');
+                prompt.className = 'notification-prompt';
+                prompt.innerHTML = `
+                    <p>💖 Get gentle reminders for your tasks?</p>
+                    <button class="btn btn-primary" onclick="enableNotifications()">Enable Reminders</button>
+                `;
+                container.insertBefore(prompt, container.firstChild);
+            }
+        } else if (Notification.permission === 'denied') {
+            console.log('🔕 Notifications were previously denied by user');
+            // Show a subtle message that notifications are disabled
+            showToast("Notifications are disabled in browser settings ⚙️");
+        } else if (Notification.permission === 'granted') {
+            console.log('✅ Notifications already enabled');
+        }
+    } else {
+        console.log('❌ This browser does not support notifications');
+        showToast("Your browser doesn't support notifications 🌸");
     }
 }
 
 function enableNotifications() {
+    console.log('🎯 User clicked to enable notifications');
+    
     if ('Notification' in window) {
         Notification.requestPermission().then(permission => {
+            console.log('Notification permission result:', permission);
+            
             if (permission === 'granted') {
                 document.querySelector('.notification-prompt')?.remove();
-                showToast("Reminders enabled! 💕");
+                showToast("Reminders enabled! You'll get gentle notifications 💕");
+                
+                // Immediately check for any pending reminders
+                checkReminders();
+            } else if (permission === 'denied') {
+                showToast("You can enable notifications in browser settings later ⚙️");
             }
+        }).catch(error => {
+            console.error('Error requesting notification permission:', error);
         });
     }
 }
@@ -1261,79 +1298,192 @@ function enableNotifications() {
 function checkReminders() {
     console.log('🔔 Checking reminders at:', new Date().toLocaleTimeString());
     
-    if ('Notification' in window && Notification.permission === 'granted') {
-        const now = new Date();
-        console.log('✅ Notifications enabled, current time:', now.toLocaleString());
-        
-        let foundReminders = false;
-        
-        tasks.forEach(task => {
-            if (task.reminder && task.reminder.trim() !== '' && !task.completed && !task.notified) {
-                // Convert reminder to proper date
+    if (typeof Notification === 'undefined') {
+        console.log('❌ Notifications not supported in this browser');
+        return;
+    }
+    
+    if (Notification.permission !== 'granted') {
+        console.log('🔕 Notifications not granted by user');
+        return;
+    }
+    
+    console.log('✅ Notifications are enabled and granted');
+    
+    const now = new Date();
+    const nowTime = now.getTime(); // Get timestamp in milliseconds
+    
+    console.log('Current time:', now.toLocaleString());
+    
+    let foundReminders = false;
+    let upcomingReminders = [];
+    
+    tasks.forEach((task, index) => {
+        if (task.reminder && task.reminder.trim() !== '' && !task.completed) {
+            try {
+                // Parse reminder time
                 let reminderTime;
-                if (task.reminder.length === 16) { // Format: "YYYY-MM-DDTHH:MM"
+                
+                // Handle different date formats
+                if (task.reminder.includes('T') && task.reminder.length === 16) {
+                    // Format: "YYYY-MM-DDTHH:MM"
                     reminderTime = new Date(task.reminder + ':00');
-                } else {
+                } else if (task.reminder.includes('T') && task.reminder.length === 19) {
+                    // Format: "YYYY-MM-DDTHH:MM:SS"
                     reminderTime = new Date(task.reminder);
+                } else if (task.reminder.includes('T')) {
+                    // Try parsing as-is
+                    reminderTime = new Date(task.reminder);
+                } else {
+                    // If no T, it might be just time? Try to combine with today's date
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    reminderTime = new Date(todayStr + 'T' + task.reminder);
                 }
                 
-                // Debug log
-                console.log(`Task: "${task.name}"`);
-                console.log(`Reminder time: ${reminderTime.toLocaleString()}`);
-                console.log(`Now: ${now.toLocaleString()}`);
-                console.log(`Time difference (seconds): ${Math.floor((now - reminderTime) / 1000)}`);
+                // Check if reminderTime is valid
+                if (isNaN(reminderTime.getTime())) {
+                    console.log(`Invalid date format for task "${task.name}": "${task.reminder}"`);
+                    return;
+                }
                 
-                // Check if reminder time is within the last minute
-                const timeDiff = now - reminderTime;
-                if (timeDiff >= 0 && timeDiff < 60000) { // Within 1 minute after reminder
-                    console.log('🎯 SHOWING NOTIFICATION NOW!');
+                const reminderTimestamp = reminderTime.getTime();
+                const timeDiff = nowTime - reminderTimestamp;
+                const timeDiffSeconds = Math.floor(timeDiff / 1000);
+                
+                // Log for debugging
+                console.log(`[${index}] "${task.name}"`);
+                console.log(`   Reminder: ${reminderTime.toLocaleString()}`);
+                console.log(`   Now: ${now.toLocaleString()}`);
+                console.log(`   Diff: ${timeDiffSeconds}s (${timeDiffSeconds > 0 ? 'past' : 'future'})`);
+                
+                // Check if it's time for the reminder (within 2 minutes window - 30 sec before to 60 sec after)
+                if (timeDiff >= -30000 && timeDiff < 60000) { 
+                    console.log('   🎯 TIME FOR NOTIFICATION!');
                     foundReminders = true;
                     
-                    const messages = [
-                        `💕 Time to work on: ${task.name}`,
-                        `🌸 Gentle reminder: ${task.name}`,
-                        `✨ You've got this! ${task.name}`,
-                        `💖 Let's do this: ${task.name}`
-                    ];
-                    const message = messages[Math.floor(Math.random() * messages.length)];
-                    
-                    new Notification('Cozy Study Reminder', {
-                        body: message,
-                        icon: '🌸',
-                        requireInteraction: true
+                    // Check if we already notified for this task
+                    if (!task.notified) {
+                        showNotificationForTask(task);
+                        task.notified = true;
+                    } else {
+                        console.log('   Already notified for this task');
+                    }
+                } else if (timeDiff < -30000) {
+                    // Future reminder
+                    const secondsUntil = Math.abs(timeDiffSeconds);
+                    upcomingReminders.push({
+                        task: task.name,
+                        inSeconds: secondsUntil,
+                        at: reminderTime.toLocaleTimeString()
                     });
-                    
-                    task.notified = true;
-                    saveData();
                 }
+            } catch (error) {
+                console.error(`Error parsing reminder for task "${task.name}":`, error);
+                console.log(`Reminder value: "${task.reminder}"`);
             }
+        }
+    });
+    
+    // Log upcoming reminders
+    if (upcomingReminders.length > 0) {
+        console.log('⏰ Upcoming reminders:');
+        upcomingReminders.forEach(r => {
+            const minutes = Math.floor(r.inSeconds / 60);
+            const seconds = r.inSeconds % 60;
+            console.log(`   "${r.task}" at ${r.at} (in ${minutes}m ${seconds}s)`);
+        });
+    }
+    
+    if (!foundReminders) {
+        console.log('📭 No reminders due at this moment');
+    }
+    
+    // Save if any tasks were marked as notified
+    saveData();
+}
+
+// Helper function to show notification
+function showNotificationForTask(task) {
+    console.log('🔄 Showing notification for task:', task.name);
+    
+    const messages = [
+        `💕 Time to work on: ${task.name}`,
+        `🌸 Gentle reminder: ${task.name}`,
+        `✨ You've got this! ${task.name}`,
+        `💖 Let's do this: ${task.name}`
+    ];
+    const message = messages[Math.floor(Math.random() * messages.length)];
+    
+    try {
+        const notification = new Notification('Cozy Study Reminder', {
+            body: message,
+            icon: 'https://emojicdn.elk.sh/🌸', // Using an emoji as icon
+            requireInteraction: true,
+            tag: `reminder-${task.id}` // Prevent duplicate notifications
         });
         
-        if (!foundReminders) {
-            console.log('📭 No reminders due right now');
-        }
-    } else {
-        console.log('❌ Notifications not available or not granted');
-        console.log('Permission status:', Notification.permission);
+        notification.onclick = function() {
+            window.focus();
+            this.close();
+        };
+        
+        // Auto close after 10 seconds
+        setTimeout(() => {
+            notification.close();
+        }, 10000);
+        
+        // Also show toast
+        showToast(`Reminder: ${task.name} ⏰`);
+        
+        console.log('✅ Notification shown successfully');
+        
+    } catch (error) {
+        console.error('Error showing notification:', error);
+        // Fallback to toast if notification fails
+        showToast(`Reminder: ${task.name} ⏰`);
     }
 }
 
-// Test function for notifications (add this to test)
-function testNotificationNow() {
-    console.log('🔧 Testing notification system...');
+// Test function - you can call this from browser console
+function scheduleTestReminder(minutesFromNow = 1) {
+    console.log(`🧪 Scheduling test reminder for ${minutesFromNow} minute(s) from now...`);
     
-    if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Test Notification', {
-            body: 'This is a test notification! If you see this, notifications work! ✅',
-            icon: '🌸',
-            requireInteraction: true
-        });
-        console.log('Test notification sent!');
-        showToast('Test notification sent! Check your notifications. ✅');
-    } else {
-        console.log('Notification permission not granted');
-        showToast('Please enable notifications first! ⚠️');
-    }
+    const testTime = new Date(Date.now() + (minutesFromNow * 60000));
+    const reminderString = testTime.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
+    
+    const testTask = {
+        id: Date.now(),
+        name: `TEST TASK - ${minutesFromNow} min reminder`,
+        subject: 'Other',
+        due: new Date().toISOString().split('T')[0],
+        reminder: reminderString,
+        priority: 'medium',
+        completed: false,
+        notified: false
+    };
+    
+    tasks.push(testTask);
+    saveData();
+    
+    console.log(`✅ Test task added!`);
+    console.log(`   Name: "${testTask.name}"`);
+    console.log(`   Reminder: ${testTime.toLocaleTimeString()}`);
+    console.log(`   Will notify in ${minutesFromNow} minute(s)`);
+    
+    showToast(`Test reminder set for ${minutesFromNow} minute(s) from now! ⏰`);
+    
+    // Start countdown
+    let secondsLeft = minutesFromNow * 60;
+    const countdown = setInterval(() => {
+        secondsLeft--;
+        if (secondsLeft <= 0) {
+            clearInterval(countdown);
+            console.log('⏰ TEST REMINDER TIME!');
+            checkReminders();
+        } else if (secondsLeft <= 10) {
+            console.log(`Test reminder in ${secondsLeft}s...`);
+        }
+    }, 1000);
 }
 
 // Initialize the app when DOM is loaded
