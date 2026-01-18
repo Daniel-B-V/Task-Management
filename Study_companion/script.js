@@ -228,7 +228,7 @@ function showPWAInstallPrompt() {
                 const installPrompt = document.createElement('div');
                 installPrompt.className = 'notification-prompt';
                 installPrompt.innerHTML = `
-                    <p>📱 Install as app for better notifications?</p>
+                    <p>📱 Enable for better experience?</p>
                     <button class="btn btn-primary" onclick="installPWA()">Install App</button>
                     <button class="btn btn-secondary" onclick="this.parentElement.remove()">Not Now</button>
                 `;
@@ -1482,3 +1482,4 @@ function scheduleTestReminder(minutesFromNow = 1) {
 
 // Initialize the app
 document.addEventListener('DOMContentLoaded', init);
+
