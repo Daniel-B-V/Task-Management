@@ -1275,7 +1275,7 @@ function showNotificationPrompt() {
     prompt.className = 'notification-prompt';
     prompt.innerHTML = `
         <p>💖 Get reminders even when the app is closed?</p>
-        <p style="font-size: 12px; color: #666;">Install as app for best experience on mobile 📱</p>
+        <p style="font-size: 12px; color: #666;">Enable for better experience!📱</p>
         <button class="btn btn-primary" onclick="enableNotifications()">Enable Notifications</button>
         <button class="btn btn-secondary" onclick="this.parentElement.remove()" style="margin-top: 5px;">Not Now</button>
     `;
@@ -1482,4 +1482,5 @@ function scheduleTestReminder(minutesFromNow = 1) {
 
 // Initialize the app
 document.addEventListener('DOMContentLoaded', init);
+
 
