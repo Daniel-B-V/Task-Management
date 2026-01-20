@@ -1,4 +1,3 @@
-// Configuration
 let tasks = [];
 let hearts = 0;
 let currentStreak = 0;
@@ -18,7 +17,7 @@ let timer = {
     minutes: 25,
     seconds: 0,
     isRunning: false,
-    mode: 'Focus',
+    mode: 'Custom',
     interval: null
 };
 let studyStats = {
@@ -27,6 +26,13 @@ let studyStats = {
     studyTime: 0,
     subjects: {}
 };
+
+// Flashcard Configuration
+let decks = [];
+let currentStudyDeck = null;
+let currentCardIndex = 0;
+let studyHistory = [];
+let deckToDelete = null;
 
 // Check if app is installed as PWA
 let isPWA = window.matchMedia('(display-mode: standalone)').matches || 
@@ -149,18 +155,24 @@ function init() {
     }
     
     loadData();
+    initFlashcards(); // Initialize flashcard data
     applyTheme(settings.theme);
     updateWelcomeMessage();
     updateStreaks();
     renderTasks();
     renderSchedule();
+    renderFlashcards(); // Render flashcard decks
     renderRewards();
     renderRealRewards();
     renderStats();
     updateHeartsDisplay();
-    updateTimerDisplay();
+    
+    // Initialize timer with input values
+    const minutesInput = parseInt(document.getElementById('timer-minutes-input').value) || 25;
+    const secondsInput = parseInt(document.getElementById('timer-seconds-input').value) || 0;
+    setTimer(minutesInput, secondsInput, 'Custom');
+    
     setupTabs();
-    setupScheduleTabs();
     setupEventListeners();
     
     // Show PWA install prompt
@@ -189,6 +201,24 @@ function init() {
     }, 2000);
     
     showDailyAffirmation();
+}
+
+// Flashcard Data Management
+function initFlashcards() {
+    const savedDecks = localStorage.getItem('cozyStudyDecks');
+    if (savedDecks) {
+        decks = JSON.parse(savedDecks);
+    }
+    
+    const savedStudyHistory = localStorage.getItem('cozyStudyHistory');
+    if (savedStudyHistory) {
+        studyHistory = JSON.parse(savedStudyHistory);
+    }
+}
+
+function saveFlashcards() {
+    localStorage.setItem('cozyStudyDecks', JSON.stringify(decks));
+    localStorage.setItem('cozyStudyHistory', JSON.stringify(studyHistory));
 }
 
 // Register Service Worker
@@ -275,16 +305,31 @@ function loadData() {
 }
 
 function populateCustomSubjects() {
-    const select = document.getElementById('task-subject');
-    for (let i = select.options.length - 1; i >= 6; i--) {
-        select.remove(i);
+    const taskSubjectSelect = document.getElementById('task-subject');
+    const deckSubjectSelect = document.getElementById('deck-subject');
+    
+    // Clear existing custom options from both selects
+    for (let i = taskSubjectSelect.options.length - 1; i >= 6; i--) {
+        taskSubjectSelect.remove(i);
     }
     
+    for (let i = deckSubjectSelect.options.length - 1; i >= 6; i--) {
+        deckSubjectSelect.remove(i);
+    }
+    
+    // Add custom subjects to both select elements
     customSubjects.forEach(subject => {
-        const option = document.createElement('option');
-        option.value = subject;
-        option.textContent = subject + ' 📝';
-        select.appendChild(option);
+        // Add to task subject select
+        const taskOption = document.createElement('option');
+        taskOption.value = subject;
+        taskOption.textContent = subject + ' 📝';
+        taskSubjectSelect.appendChild(taskOption);
+        
+        // Add to deck subject select
+        const deckOption = document.createElement('option');
+        deckOption.value = subject;
+        deckOption.textContent = subject + ' 📝';
+        deckSubjectSelect.appendChild(deckOption);
     });
 }
 
@@ -312,29 +357,47 @@ function showAddSubject() {
 function addNewSubject() {
     const newSubject = document.getElementById('new-subject').value.trim();
     if (newSubject) {
-        const select = document.getElementById('task-subject');
-        const existingOption = Array.from(select.options).find(option => 
+        const taskSubjectSelect = document.getElementById('task-subject');
+        const deckSubjectSelect = document.getElementById('deck-subject');
+        
+        // Check if subject already exists in either select
+        const existingTaskOption = Array.from(taskSubjectSelect.options).find(option => 
             option.value.toLowerCase() === newSubject.toLowerCase()
         );
         
-        if (existingOption) {
+        const existingDeckOption = Array.from(deckSubjectSelect.options).find(option => 
+            option.value.toLowerCase() === newSubject.toLowerCase()
+        );
+        
+        if (existingTaskOption || existingDeckOption) {
             showToast(`Subject "${newSubject}" already exists! 📚`);
-            select.value = newSubject;
+            taskSubjectSelect.value = newSubject;
+            deckSubjectSelect.value = newSubject;
             document.getElementById('add-subject-input').style.display = 'none';
             document.getElementById('new-subject').value = '';
             return;
         }
         
+        // Add to custom subjects array if not already there
         if (!customSubjects.includes(newSubject)) {
             customSubjects.push(newSubject);
         }
         
-        const option = document.createElement('option');
-        option.value = newSubject;
-        option.textContent = newSubject + ' 📝';
-        select.appendChild(option);
+        // Add to task subject select
+        const taskOption = document.createElement('option');
+        taskOption.value = newSubject;
+        taskOption.textContent = newSubject + ' 📝';
+        taskSubjectSelect.appendChild(taskOption);
         
-        select.value = newSubject;
+        // Add to deck subject select
+        const deckOption = document.createElement('option');
+        deckOption.value = newSubject;
+        deckOption.textContent = newSubject + ' 📝';
+        deckSubjectSelect.appendChild(deckOption);
+        
+        // Set the value in both selects
+        taskSubjectSelect.value = newSubject;
+        deckSubjectSelect.value = newSubject;
         
         document.getElementById('add-subject-input').style.display = 'none';
         document.getElementById('new-subject').value = '';
@@ -345,8 +408,84 @@ function addNewSubject() {
     }
 }
 
+function showAddSubjectForDeck() {
+    const deckAddSubjectInput = document.getElementById('deck-add-subject-input');
+    deckAddSubjectInput.style.display = 'block';
+    document.getElementById('deck-new-subject').focus();
+}
+
+function addNewSubjectForDeck() {
+    const newSubject = document.getElementById('deck-new-subject').value.trim();
+    if (newSubject) {
+        const deckSubjectSelect = document.getElementById('deck-subject');
+        const taskSubjectSelect = document.getElementById('task-subject');
+        
+        // Check if subject already exists
+        const existingDeckOption = Array.from(deckSubjectSelect.options).find(option => 
+            option.value.toLowerCase() === newSubject.toLowerCase()
+        );
+        
+        const existingTaskOption = Array.from(taskSubjectSelect.options).find(option => 
+            option.value.toLowerCase() === newSubject.toLowerCase()
+        );
+        
+        if (existingDeckOption || existingTaskOption) {
+            showToast(`Subject "${newSubject}" already exists! 📚`);
+            deckSubjectSelect.value = newSubject;
+            document.getElementById('deck-add-subject-input').style.display = 'none';
+            document.getElementById('deck-new-subject').value = '';
+            return;
+        }
+        
+        // Add to custom subjects array if not already there
+        if (!customSubjects.includes(newSubject)) {
+            customSubjects.push(newSubject);
+        }
+        
+        // Add to deck subject select
+        const deckOption = document.createElement('option');
+        deckOption.value = newSubject;
+        deckOption.textContent = newSubject + ' 📝';
+        deckSubjectSelect.appendChild(deckOption);
+        
+        // Also add to task subject select for consistency
+        const taskOption = document.createElement('option');
+        taskOption.value = newSubject;
+        taskOption.textContent = newSubject + ' 📝';
+        taskSubjectSelect.appendChild(taskOption);
+        
+        // Set the value in deck select
+        deckSubjectSelect.value = newSubject;
+        
+        document.getElementById('deck-add-subject-input').style.display = 'none';
+        document.getElementById('deck-new-subject').value = '';
+        
+        saveData();
+        
+        showToast(`Added new subject: ${newSubject} 📚`);
+    }
+}
+
 function getSubjectColor(subject) {
-    return subjectColors[subject] || '#999';
+    // If it's a standard subject, use predefined color
+    if (subjectColors[subject]) {
+        return subjectColors[subject];
+    }
+    
+    // For custom subjects, generate a color based on the subject name
+    if (customSubjects.includes(subject)) {
+        // Create a simple hash for consistent color generation
+        let hash = 0;
+        for (let i = 0; i < subject.length; i++) {
+            hash = subject.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        
+        // Generate HSL color with fixed saturation and lightness
+        const hue = Math.abs(hash % 360);
+        return `hsl(${hue}, 70%, 60%)`;
+    }
+    
+    return '#999'; // Default color
 }
 
 function getSubjectEmoji(subject) {
@@ -371,8 +510,30 @@ function selectTheme(themeName) {
 // Timer Functions
 function startTimer() {
     if (!timer.isRunning) {
+        // Get values from input fields
+        const minutesInput = parseInt(document.getElementById('timer-minutes-input').value) || 0;
+        const secondsInput = parseInt(document.getElementById('timer-seconds-input').value) || 0;
+        
+        // Validate inputs
+        if (minutesInput < 0 || minutesInput > 120 || secondsInput < 0 || secondsInput > 59) {
+            showToast("Please enter valid time values! ⏰");
+            return;
+        }
+        
+        if (minutesInput === 0 && secondsInput === 0) {
+            showToast("Please set a time! ⏰");
+            return;
+        }
+        
+        // Set the timer with input values
+        timer.minutes = minutesInput;
+        timer.seconds = secondsInput;
+        timer.mode = 'Custom';
         timer.isRunning = true;
         timer.interval = setInterval(updateTimer, 1000);
+        
+        document.getElementById('current-mode').textContent = 'Custom';
+        updateTimerDisplay();
         document.getElementById('timer-start-btn').textContent = 'Pause';
         showToast("Timer started! Focus time! 🎯");
     } else {
@@ -390,27 +551,38 @@ function pauseTimer() {
 function stopTimer() {
     timer.isRunning = false;
     clearInterval(timer.interval);
-    setTimer(25, 'Focus');
-    closeTimerModal();
-    showToast("Timer stopped. Great work! 💪");
+    document.getElementById('timer-start-btn').textContent = 'Start';
+    showToast("Timer stopped at current time! ⏰");
+    
+    // Don't close the modal, just stop the timer
+    // The timer stays at its current position
 }
 
 function resetTimer() {
-    if (timer.mode === 'Focus') {
-        setTimer(25, 'Focus');
-    } else if (timer.mode === 'Break') {
-        setTimer(5, 'Break');
-    } else {
-        setTimer(10, 'Long Break');
+    if (timer.isRunning) {
+        clearInterval(timer.interval);
+        timer.isRunning = false;
     }
+    
+    // Reset to current input values
+    const minutesInput = parseInt(document.getElementById('timer-minutes-input').value) || 25;
+    const secondsInput = parseInt(document.getElementById('timer-seconds-input').value) || 0;
+    
+    setTimer(minutesInput, secondsInput, 'Custom');
+    document.getElementById('timer-start-btn').textContent = 'Start';
 }
 
-function setTimer(minutes, mode) {
+function setTimer(minutes, seconds, mode = 'Custom') {
     timer.minutes = minutes;
-    timer.seconds = 0;
+    timer.seconds = seconds;
     timer.mode = mode;
-    updateTimerDisplay();
+    
+    // Update input fields to match
+    document.getElementById('timer-minutes-input').value = minutes;
+    document.getElementById('timer-seconds-input').value = seconds;
     document.getElementById('current-mode').textContent = mode;
+    
+    updateTimerDisplay();
 }
 
 function updateTimer() {
@@ -420,23 +592,20 @@ function updateTimer() {
             timer.isRunning = false;
             document.getElementById('timer-start-btn').textContent = 'Start';
             
+            // Timer completed
+            celebrate();
+            showToast("Time's up! Great work! ⏰");
+            
+            // Add study time and hearts based on the completed timer duration
             if (timer.mode === 'Focus') {
-                studyStats.studyTime += 25;
-                hearts += 10;
+                const originalMinutes = parseInt(document.getElementById('timer-minutes-input').value) || 25;
+                studyStats.studyTime += originalMinutes;
+                hearts += Math.max(10, Math.floor(originalMinutes / 5) * 2);
                 updateHeartsDisplay();
                 saveData();
                 renderStats();
-                
-                celebrate();
-                showToast("Great focus session! You earned 10 hearts! 💖");
-                
-                if (confirm("Time for a 5-minute break? You've earned it! 🌸")) {
-                    setTimer(5, 'Break');
-                    startTimer();
-                }
-            } else {
-                showToast("Break time's up! Ready for another session? 🎯");
             }
+            
             return;
         }
         timer.minutes--;
@@ -463,7 +632,7 @@ function updateNavTimer() {
     }
 }
 
-// Modal Functions
+// Modal Functions - Updated to close on outside click
 function openTimerModal() {
     document.getElementById('timer-modal').classList.add('active');
 }
@@ -587,8 +756,102 @@ function selectPriority(priority) {
     document.querySelector(`[data-priority="${priority}"]`).classList.add('selected');
 }
 
-// Event Listeners
+// Event Listeners - Updated to handle modal outside clicks
 function setupEventListeners() {
+    // Modal outside click handlers
+    document.addEventListener('click', (e) => {
+        // Timer modal outside click
+        const timerModal = document.getElementById('timer-modal');
+        if (timerModal && timerModal.classList.contains('active') && 
+            e.target === timerModal) {
+            closeTimerModal();
+        }
+        
+        // Settings modal outside click
+        const settingsModal = document.getElementById('settings-modal');
+        if (settingsModal && settingsModal.classList.contains('active') && 
+            e.target === settingsModal) {
+            closeSettings();
+        }
+        
+        // Task modal outside click
+        const taskModal = document.getElementById('task-modal');
+        if (taskModal && taskModal.classList.contains('active') && 
+            e.target === taskModal) {
+            closeTaskModal();
+        }
+        
+        // Deck modal outside click
+        const deckModal = document.getElementById('deck-modal');
+        if (deckModal && deckModal.classList.contains('active') && 
+            e.target === deckModal) {
+            closeDeckModal();
+        }
+        
+        // Card modal outside click
+        const cardModal = document.getElementById('card-modal');
+        if (cardModal && cardModal.classList.contains('active') && 
+            e.target === cardModal) {
+            closeCardModal();
+        }
+        
+        // Study modal outside click
+        const studyModal = document.getElementById('study-modal');
+        if (studyModal && studyModal.classList.contains('active') && 
+            e.target === studyModal) {
+            closeStudyModal();
+        }
+        
+        // Delete modal outside click
+        const deleteModal = document.getElementById('delete-modal');
+        if (deleteModal && deleteModal.classList.contains('active') && 
+            e.target === deleteModal) {
+            closeDeleteModal();
+        }
+        
+        // Delete deck modal outside click
+        const deleteDeckModal = document.getElementById('delete-deck-modal');
+        if (deleteDeckModal && deleteDeckModal.classList.contains('active') && 
+            e.target === deleteDeckModal) {
+            closeDeleteDeckModal();
+        }
+        
+        // Secret modal outside click
+        const secretModal = document.getElementById('secret-modal');
+        if (secretModal && secretModal.classList.contains('active') && 
+            e.target === secretModal) {
+            closeSecretModal();
+        }
+        
+        // Day tasks modal outside click
+        const dayTasksModal = document.getElementById('day-tasks-modal');
+        if (dayTasksModal && dayTasksModal.classList.contains('active') && 
+            e.target === dayTasksModal) {
+            closeDayTasksModal();
+        }
+        
+        // Add subject input clicks
+        const addSubjectInput = document.getElementById('add-subject-input');
+        const addSubjectBtn = document.querySelector('.add-subject-btn');
+        const deckAddSubjectInput = document.getElementById('deck-add-subject-input');
+        const deckAddSubjectBtn = document.querySelector('.deck-add-subject-btn');
+        
+        if (addSubjectInput.style.display === 'block' && 
+            !addSubjectInput.contains(e.target) && 
+            !addSubjectBtn.contains(e.target)) {
+            addSubjectInput.style.display = 'none';
+            document.getElementById('new-subject').value = '';
+        }
+        
+        if (deckAddSubjectInput && deckAddSubjectInput.style.display === 'block' && 
+            !deckAddSubjectInput.contains(e.target) && 
+            !deckAddSubjectBtn.contains(e.target)) {
+            deckAddSubjectInput.style.display = 'none';
+            document.getElementById('deck-new-subject').value = '';
+        }
+    });
+
+    // Form submissions
     document.getElementById('task-form').addEventListener('submit', (e) => {
         e.preventDefault();
         
@@ -638,17 +901,30 @@ function setupEventListeners() {
         }
     });
 
-    document.addEventListener('click', (e) => {
-        const addSubjectInput = document.getElementById('add-subject-input');
-        const addSubjectBtn = document.querySelector('.add-subject-btn');
-        
-        if (addSubjectInput.style.display === 'block' && 
-            !addSubjectInput.contains(e.target) && 
-            !addSubjectBtn.contains(e.target)) {
-            addSubjectInput.style.display = 'none';
-            document.getElementById('new-subject').value = '';
+    // Timer input listeners
+    document.getElementById('timer-minutes-input').addEventListener('change', function() {
+        const minutes = parseInt(this.value) || 0;
+        if (minutes < 0) this.value = 0;
+        if (minutes > 120) this.value = 120;
+        if (!timer.isRunning) {
+            timer.minutes = minutes;
+            updateTimerDisplay();
         }
     });
+    
+    document.getElementById('timer-seconds-input').addEventListener('change', function() {
+        const seconds = parseInt(this.value) || 0;
+        if (seconds < 0) this.value = 0;
+        if (seconds > 59) this.value = 59;
+        if (!timer.isRunning) {
+            timer.seconds = seconds;
+            updateTimerDisplay();
+        }
+    });
+    
+    // Flashcard form submissions
+    document.getElementById('deck-form').addEventListener('submit', handleDeckFormSubmit);
+    document.getElementById('card-form').addEventListener('submit', handleCardFormSubmit);
 }
 
 // UI Updates
@@ -855,6 +1131,374 @@ function confirmDelete() {
         showToast("Task deleted 📭");
         closeDeleteModal();
     }
+}
+
+// Flashcard Functions
+function renderFlashcards() {
+    const container = document.getElementById('decks-container');
+    
+    if (decks.length === 0) {
+        container.innerHTML = `
+            <div class="empty-decks-state">
+                <div class="empty-decks-emoji">🎴</div>
+                <p>No flashcard decks yet!</p>
+                <p style="font-size: 14px; margin-top: 10px;">Create your first deck to start studying 💕</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    
+    decks.forEach(deck => {
+        const totalCards = deck.cards ? deck.cards.length : 0;
+        const masteredCards = deck.cards ? deck.cards.filter(card => card.mastered).length : 0;
+        const masteryPercentage = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
+        const lastStudied = deck.lastStudied ? formatRelativeDate(new Date(deck.lastStudied)) : 'Never';
+        const subjectEmoji = getSubjectEmoji(deck.subject);
+        
+        html += `
+            <div class="deck-card">
+                <div class="deck-header">
+                    <div class="deck-name">
+                        ${deck.name} 
+                        <span class="deck-subject">${subjectEmoji} ${deck.subject}</span>
+                    </div>
+                    <div class="deck-progress">${masteryPercentage}%</div>
+                </div>
+                
+                ${deck.description ? `<p style="font-size: 14px; color: #666; margin: 10px 0;">${deck.description}</p>` : ''}
+                
+                <div class="deck-stats">
+                    <div class="deck-stat">
+                        <span>🎴</span>
+                        <span class="deck-stat-detail">${totalCards} cards</span>
+                    </div>
+                    <div class="deck-stat">
+                        <span>✅</span>
+                        <span class="deck-stat-detail">${masteredCards} mastered</span>
+                    </div>
+                    <div class="deck-stat">
+                        <span>📅</span>
+                        <span class="deck-stat-detail">${lastStudied}</span>
+                    </div>
+                </div>
+                
+                <div class="deck-actions">
+                    <button class="deck-btn study-btn" onclick="startStudying('${deck.id}')">
+                        Study Now
+                    </button>
+                    <button class="deck-btn edit-deck-btn" onclick="editDeck('${deck.id}')">
+                        Add Cards
+                    </button>
+                    <button class="deck-btn delete-deck-btn" onclick="openDeleteDeckModal('${deck.id}')">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function openDeckModal(deckId = null) {
+    const modal = document.getElementById('deck-modal');
+    const form = document.getElementById('deck-form');
+    
+    // Hide any existing add subject inputs
+    document.getElementById('deck-add-subject-input').style.display = 'none';
+    document.getElementById('deck-new-subject').value = '';
+    
+    if (deckId) {
+        const deck = decks.find(d => d.id === deckId);
+        document.getElementById('deck-modal-title').textContent = 'Edit Deck';
+        document.getElementById('deck-name').value = deck.name;
+        document.getElementById('deck-subject').value = deck.subject;
+        document.getElementById('deck-description').value = deck.description || '';
+        form.dataset.deckId = deckId;
+    } else {
+        document.getElementById('deck-modal-title').textContent = 'Create New Deck';
+        form.reset();
+        delete form.dataset.deckId;
+    }
+    
+    modal.classList.add('active');
+}
+
+function closeDeckModal() {
+    document.getElementById('deck-modal').classList.remove('active');
+    document.getElementById('deck-form').reset();
+    delete document.getElementById('deck-form').dataset.deckId;
+    document.getElementById('deck-add-subject-input').style.display = 'none';
+    document.getElementById('deck-new-subject').value = '';
+}
+
+function handleDeckFormSubmit(e) {
+    e.preventDefault();
+    
+    const deckData = {
+        name: document.getElementById('deck-name').value,
+        subject: document.getElementById('deck-subject').value,
+        description: document.getElementById('deck-description').value,
+        cards: [],
+        createdAt: new Date().toISOString(),
+        lastStudied: null
+    };
+    
+    const form = document.getElementById('deck-form');
+    const deckId = form.dataset.deckId;
+    
+    if (deckId) {
+        // Update existing deck
+        const deckIndex = decks.findIndex(d => d.id === deckId);
+        if (deckIndex !== -1) {
+            decks[deckIndex].name = deckData.name;
+            decks[deckIndex].subject = deckData.subject;
+            decks[deckIndex].description = deckData.description;
+        }
+        showToast("Deck updated! ✏️");
+    } else {
+        // Create new deck
+        deckData.id = 'deck_' + Date.now();
+        decks.push(deckData);
+        showToast("New deck created! 🎴");
+    }
+    
+    saveFlashcards();
+    renderFlashcards();
+    closeDeckModal();
+}
+
+function editDeck(deckId) {
+    openCardModal(deckId);
+}
+
+function openCardModal(deckId) {
+    const modal = document.getElementById('card-modal');
+    const deck = decks.find(d => d.id === deckId);
+    
+    if (!deck) return;
+    
+    document.getElementById('card-modal-title').textContent = `Add Card to "${deck.name}"`;
+    document.getElementById('card-form').dataset.deckId = deckId;
+    document.getElementById('card-form').reset();
+    
+    modal.classList.add('active');
+}
+
+function closeCardModal() {
+    document.getElementById('card-modal').classList.remove('active');
+    document.getElementById('card-form').reset();
+    delete document.getElementById('card-form').dataset.deckId;
+}
+
+function handleCardFormSubmit(e) {
+    e.preventDefault();
+    
+    const deckId = document.getElementById('card-form').dataset.deckId;
+    const deckIndex = decks.findIndex(d => d.id === deckId);
+    
+    if (deckIndex === -1) return;
+    
+    const cardData = {
+        id: 'card_' + Date.now(),
+        front: document.getElementById('card-front').value,
+        back: document.getElementById('card-back').value,
+        createdAt: new Date().toISOString(),
+        lastReviewed: null,
+        mastered: false,
+        reviewCount: 0
+    };
+    
+    // Initialize cards array if it doesn't exist
+    if (!decks[deckIndex].cards) {
+        decks[deckIndex].cards = [];
+    }
+    
+    decks[deckIndex].cards.push(cardData);
+    saveFlashcards();
+    renderFlashcards();
+    
+    // Clear form but keep modal open for adding more cards
+    document.getElementById('card-front').value = '';
+    document.getElementById('card-back').value = '';
+    document.getElementById('card-front').focus();
+    
+    showToast("Card added! 📝 Keep adding or close when done.");
+}
+
+function startStudying(deckId) {
+    currentStudyDeck = decks.find(d => d.id === deckId);
+    
+    if (!currentStudyDeck || !currentStudyDeck.cards || currentStudyDeck.cards.length === 0) {
+        showToast("This deck has no cards yet! Add some first 📝");
+        openCardModal(deckId);
+        return;
+    }
+    
+    currentCardIndex = 0;
+    currentStudyDeck.lastStudied = new Date().toISOString();
+    saveFlashcards();
+    
+    // Reset all cards to not flipped
+    document.getElementById('flashcard').classList.remove('flipped');
+    
+    // Update study modal
+    document.getElementById('study-deck-name').textContent = currentStudyDeck.name;
+    document.getElementById('total-cards').textContent = currentStudyDeck.cards.length;
+    
+    showCard();
+    document.getElementById('study-modal').classList.add('active');
+}
+
+function closeStudyModal() {
+    document.getElementById('study-modal').classList.remove('active');
+    
+    // Save study session
+    if (currentStudyDeck) {
+        const session = {
+            deckId: currentStudyDeck.id,
+            deckName: currentStudyDeck.name,
+            date: new Date().toISOString(),
+            cardsStudied: currentStudyDeck.cards.length,
+            cardsMastered: currentStudyDeck.cards.filter(c => c.mastered).length
+        };
+        
+        studyHistory.push(session);
+        saveFlashcards();
+    }
+    
+    currentStudyDeck = null;
+    currentCardIndex = 0;
+    
+    renderFlashcards();
+    showToast("Great study session! 💪");
+}
+
+function showCard() {
+    if (!currentStudyDeck || !currentStudyDeck.cards || currentStudyDeck.cards.length === 0) {
+        closeStudyModal();
+        return;
+    }
+    
+    const card = currentStudyDeck.cards[currentCardIndex];
+    
+    document.getElementById('card-front-content').textContent = card.front;
+    document.getElementById('card-back-content').textContent = card.back;
+    document.getElementById('current-card-number').textContent = currentCardIndex + 1;
+    
+    // Reset card to front side
+    document.getElementById('flashcard').classList.remove('flipped');
+}
+
+function flipCard() {
+    const flashcard = document.getElementById('flashcard');
+    flashcard.classList.toggle('flipped');
+}
+
+function nextCard() {
+    if (!currentStudyDeck || !currentStudyDeck.cards) return;
+    
+    if (currentCardIndex < currentStudyDeck.cards.length - 1) {
+        currentCardIndex++;
+    } else {
+        currentCardIndex = 0; // Loop back to start
+    }
+    
+    showCard();
+}
+
+function previousCard() {
+    if (!currentStudyDeck || !currentStudyDeck.cards) return;
+    
+    if (currentCardIndex > 0) {
+        currentCardIndex--;
+    } else {
+        currentCardIndex = currentStudyDeck.cards.length - 1; // Loop to end
+    }
+    
+    showCard();
+}
+
+function shuffleCards() {
+    if (!currentStudyDeck || !currentStudyDeck.cards) return;
+    
+    // Fisher-Yates shuffle algorithm
+    for (let i = currentStudyDeck.cards.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [currentStudyDeck.cards[i], currentStudyDeck.cards[j]] = [currentStudyDeck.cards[j], currentStudyDeck.cards[i]];
+    }
+    
+    currentCardIndex = 0;
+    showCard();
+    showToast("Cards shuffled! 🔀");
+}
+
+function markCard(status) {
+    if (!currentStudyDeck || !currentStudyDeck.cards) return;
+    
+    const card = currentStudyDeck.cards[currentCardIndex];
+    card.lastReviewed = new Date().toISOString();
+    card.reviewCount = (card.reviewCount || 0) + 1;
+    
+    if (status === 'correct') {
+        card.mastered = true;
+        celebrate();
+        hearts += 2; // Small heart reward for learning
+        updateHeartsDisplay();
+        saveData();
+        showToast("Great job! You know this one! ✅ +2 hearts");
+    } else {
+        card.mastered = false;
+        showToast("That's okay! Review helps learning ❌");
+    }
+    
+    // Save the deck after marking
+    saveFlashcards();
+    
+    // Move to next card automatically
+    setTimeout(() => {
+        nextCard();
+    }, 1000);
+}
+
+function openDeleteDeckModal(deckId) {
+    const deck = decks.find(d => d.id === deckId);
+    if (deck) {
+        deckToDelete = deckId;
+        document.getElementById('delete-deck-name').textContent = `"${deck.name}"`;
+        document.getElementById('delete-deck-message-text').textContent = 
+            'Are you sure you want to delete this deck and all its cards?';
+        document.getElementById('delete-deck-modal').classList.add('active');
+    }
+}
+
+function closeDeleteDeckModal() {
+    document.getElementById('delete-deck-modal').classList.remove('active');
+    deckToDelete = null;
+}
+
+function confirmDeleteDeck() {
+    if (deckToDelete) {
+        decks = decks.filter(d => d.id !== deckToDelete);
+        saveFlashcards();
+        renderFlashcards();
+        showToast("Deck deleted 🗑️");
+        closeDeleteDeckModal();
+    }
+}
+
+function formatRelativeDate(date) {
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    return `${Math.floor(diffDays / 30)} months ago`;
 }
 
 // Rewards
@@ -1092,7 +1736,19 @@ function setupTabs() {
             document.querySelectorAll('.tabs .tab[data-view]').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             tab.classList.add('active');
-            document.getElementById(tab.dataset.view + '-view').classList.add('active');
+            
+            const viewId = tab.dataset.view + '-view';
+            document.getElementById(viewId).classList.add('active');
+            
+            // If clicking flashcards tab, render flashcards
+            if (tab.dataset.view === 'flashcards') {
+                renderFlashcards();
+            }
+            
+            // If clicking schedule tab, go to current month
+            if (tab.dataset.view === 'schedule') {
+                goToCurrentMonth();
+            }
         });
     });
     
@@ -1102,17 +1758,6 @@ function setupTabs() {
             goToCurrentMonth();
         });
     }
-}
-
-function setupScheduleTabs() {
-    document.querySelectorAll('.tab[data-schedule]').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.tab[data-schedule]').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.schedule-content').forEach(s => s.classList.remove('active'));
-            tab.classList.add('active');
-            document.getElementById(tab.dataset.schedule + '-schedule').classList.add('active');
-        });
-    });
 }
 
 // Calendar Functions
@@ -1488,6 +2133,3 @@ function showRegularNotification(task, message) {
 
 // Initialize the app
 document.addEventListener('DOMContentLoaded', init);
-
-
-
