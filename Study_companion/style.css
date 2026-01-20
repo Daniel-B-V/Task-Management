@@ -11,6 +11,8 @@ body {
     padding-bottom: 100px;
     transition: background 0.5s ease;
     padding-top: 60px; /* Space for sticky nav */
+    overflow-x: hidden;
+    width: 100%;
 }
 
 /* Theme Variables */
@@ -74,6 +76,7 @@ body {
     text-align: center;
     color: white;
     padding: 20px;
+    max-width: 300px;
 }
 
 .loading-emoji {
@@ -166,8 +169,10 @@ body {
 .container {
     max-width: 390px;
     margin: 0 auto;
-    padding: 20px;
-    padding-top: 10px; /* Reduced since nav is fixed */
+    padding: 15px;
+    padding-top: 10px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* Header Improvements */
@@ -329,15 +334,16 @@ body {
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 8px;
+    gap: 5px;
+    max-width: 100%;
 }
 
 .calendar-day {
     background: white;
-    padding: 10px;
+    padding: 8px 3px;
     border-radius: 10px;
     text-align: center;
-    min-height: 80px;
+    min-height: 60px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -346,6 +352,7 @@ body {
     transition: all 0.3s ease;
     cursor: pointer;
     position: relative;
+    font-size: 12px;
 }
 
 .calendar-day.empty {
@@ -370,7 +377,7 @@ body {
 }
 
 .day-number {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: bold;
     margin-bottom: 5px;
 }
@@ -517,12 +524,29 @@ body {
     width: 100%;
 }
 
-/* Stats View */
+/* Stats View Fixes */
+#tasks-view,
+#schedule-view,
+#flashcards-view,
+#rewards-view,
+#stats-view {
+    min-height: 400px;
+    max-height: calc(100vh - 250px);
+    overflow-y: auto;
+    padding-bottom: 20px;
+}
+
+#stats-view {
+    padding-bottom: 30px;
+}
+
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 15px;
     margin-bottom: 20px;
+    max-width: 100%;
+    overflow: visible;
 }
 
 .stat-card {
@@ -531,23 +555,31 @@ body {
     border-radius: 15px;
     text-align: center;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 
 .stat-emoji {
     font-size: 30px;
     margin-bottom: 10px;
+    line-height: 1;
 }
 
 .stat-value {
-    font-size: 24px;
+    font-size: 20px;
     font-weight: bold;
     color: var(--accent-color);
     margin-bottom: 5px;
+    line-height: 1;
 }
 
 .stat-label {
     font-size: 12px;
     color: #999;
+    line-height: 1.2;
 }
 
 .affirmation-card {
@@ -560,6 +592,9 @@ body {
     color: var(--accent-color);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     margin-bottom: 20px;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
 }
 
 .subject-breakdown {
@@ -567,6 +602,14 @@ body {
     padding: 15px;
     border-radius: 15px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    margin-top: 20px;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.subject-bar {
+    margin-bottom: 15px;
+    width: 100%;
 }
 
 /* Delete Modal */
@@ -700,6 +743,11 @@ body {
     z-index: 1000;
     opacity: 0;
     transition: all 0.3s ease;
+    max-width: 300px;
+    width: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .toast.show {
@@ -828,6 +876,26 @@ body {
     
     .stats-grid {
         grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .stat-card {
+        padding: 12px;
+        min-height: 100px;
+    }
+    
+    .stat-emoji {
+        font-size: 24px;
+        margin-bottom: 8px;
+    }
+    
+    .stat-value {
+        font-size: 18px;
+        margin-bottom: 3px;
+    }
+    
+    .stat-label {
+        font-size: 11px;
     }
     
     .quick-add {
@@ -842,6 +910,10 @@ body {
         margin: 10px;
         max-height: 80vh;
         overflow-y: auto;
+        max-width: 350px;
+        width: 90%;
+        max-height: 85vh;
+        overflow-y: auto;
     }
     
     .priority-btn {
@@ -851,6 +923,16 @@ body {
     
     .timer-display {
         font-size: 36px;
+    }
+    
+    /* Views Container */
+    #tasks-view,
+    #schedule-view,
+    #flashcards-view,
+    #rewards-view,
+    #stats-view {
+        max-height: calc(100vh - 220px);
+        min-height: 350px;
     }
 }
 
@@ -883,9 +965,16 @@ h1 {
     display: flex;
     gap: 10px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
-.add-subject-btn {
+.subject-selector select {
+    flex: 1;
+    min-width: 150px;
+}
+
+.add-subject-btn,
+.deck-add-subject-btn {
     padding: 12px 15px;
     background: var(--secondary-color);
     border: 2px solid var(--secondary-color);
@@ -898,7 +987,8 @@ h1 {
     transition: all 0.3s ease;
 }
 
-.add-subject-btn:hover {
+.add-subject-btn:hover,
+.deck-add-subject-btn:hover {
     background: var(--primary-color);
     color: white;
     border-color: var(--primary-color);
@@ -906,15 +996,18 @@ h1 {
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
-.add-subject-btn:active {
+.add-subject-btn:active,
+.deck-add-subject-btn:active {
     transform: translateY(0);
 }
 
-#add-subject-input {
+#add-subject-input,
+#deck-add-subject-input {
     animation: fadeIn 0.3s ease;
 }
 
-#new-subject {
+#new-subject,
+#deck-new-subject {
     width: 100%;
     padding: 12px;
     border: 2px solid var(--secondary-color);
@@ -923,7 +1016,8 @@ h1 {
     margin-bottom: 5px;
 }
 
-#new-subject:focus {
+#new-subject:focus,
+#deck-new-subject:focus {
     outline: none;
     border-color: var(--primary-color);
 }
@@ -946,12 +1040,14 @@ h1 {
         gap: 8px;
     }
     
-    .add-subject-btn {
+    .add-subject-btn,
+    .deck-add-subject-btn {
         width: 100%;
         padding: 12px;
     }
     
-    #task-subject {
+    #task-subject,
+    #deck-subject {
         width: 100%;
     }
 }
@@ -974,25 +1070,28 @@ h1 {
 
 .tabs {
     display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
+    gap: 5px;
+    margin-bottom: 15px;
     background: rgba(255, 255, 255, 0.9);
-    padding: 10px;
+    padding: 8px;
     border-radius: 15px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    flex-wrap: wrap;
 }
 
 .tab {
     flex: 1;
-    padding: 12px;
+    padding: 10px;
     border: none;
     background: transparent;
     color: var(--primary-color);
     border-radius: 10px;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: bold;
     cursor: pointer;
     transition: all 0.3s;
+    min-width: 60px;
+    text-align: center;
 }
 
 .tab.active {
@@ -1193,6 +1292,8 @@ input:focus, select:focus, textarea:focus {
     font-size: 16px;
     font-weight: bold;
     color: #333;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
 }
 
 .task-name.completed {
@@ -1297,16 +1398,18 @@ input:focus, select:focus, textarea:focus {
 .rewards-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
+    gap: 10px;
+    max-width: 100%;
 }
 
 .reward-card {
     background: white;
-    padding: 20px;
+    padding: 15px;
     border-radius: 15px;
     text-align: center;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     position: relative;
+    max-width: 100%;
 }
 
 .reward-card.locked {
@@ -1323,6 +1426,8 @@ input:focus, select:focus, textarea:focus {
     color: #333;
     font-weight: bold;
     margin-bottom: 5px;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
 }
 
 .reward-cost {
@@ -1396,4 +1501,432 @@ input:focus, select:focus, textarea:focus {
     padding: 8px 15px;
     border-radius: 10px;
     display: inline-block;
+}
+
+/* =========================== */
+/* FLASHCARD STYLES - ADDED */
+/* =========================== */
+
+/* Flashcard Decks Container */
+#decks-container {
+    max-height: calc(100vh - 300px);
+    overflow-y: auto;
+    padding-bottom: 20px;
+}
+
+.deck-card {
+    background: rgba(255, 255, 255, 0.9);
+    padding: 15px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    margin-bottom: 15px;
+    max-width: 100%;
+    overflow: hidden;
+    border-left: 4px solid var(--primary-color);
+    position: relative;
+}
+
+.deck-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.deck-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.deck-name {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--accent-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}
+
+.deck-subject {
+    font-size: 11px;
+    background: var(--secondary-color);
+    color: var(--accent-color);
+    padding: 3px 8px;
+    border-radius: 10px;
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.deck-progress {
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--primary-color);
+    background: rgba(255, 255, 255, 0.7);
+    padding: 3px 8px;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+
+.deck-stats {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    font-size: 11px;
+    color: #999;
+    flex-wrap: wrap;
+}
+
+.deck-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.deck-stat-detail {
+    background: rgba(255, 255, 255, 0.5);
+    padding: 2px 5px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 10px;
+}
+
+.deck-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+}
+
+.deck-btn {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 8px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 0;
+    white-space: nowrap;
+}
+
+.study-btn {
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    color: white;
+}
+
+.edit-deck-btn {
+    background: var(--secondary-color);
+    color: var(--accent-color);
+}
+
+.delete-deck-btn {
+    background: #ffd1dc;
+    color: #ff6b9d;
+}
+
+/* No Decks State */
+.empty-decks-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #999;
+}
+
+.empty-decks-emoji {
+    font-size: 60px;
+    margin-bottom: 10px;
+}
+
+/* Study Modal Flashcard */
+.flashcard-container {
+    perspective: 1000px;
+    width: 100%;
+    height: 200px;
+    margin: 15px auto;
+}
+
+.flashcard {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: pointer;
+}
+
+.flashcard.flipped {
+    transform: rotateY(180deg);
+}
+
+.flashcard-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+}
+
+.flashcard-front, .flashcard-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    border-radius: 15px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    overflow-y: auto;
+}
+
+.flashcard-front {
+    background: linear-gradient(135deg, #ffffff, #f8f9fa);
+    border: 3px solid var(--secondary-color);
+}
+
+.flashcard-back {
+    background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+    color: white;
+    transform: rotateY(180deg);
+}
+
+.card-label {
+    font-size: 12px;
+    color: var(--accent-color);
+    font-weight: bold;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.flashcard-back .card-label {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.card-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1.5;
+    text-align: center;
+    overflow-y: auto;
+    padding: 10px;
+    max-height: 120px;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}
+
+.flip-hint {
+    text-align: center;
+    color: #999;
+    font-size: 12px;
+    margin-top: 10px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.5; }
+    50% { opacity: 1; }
+    100% { opacity: 0.5; }
+}
+
+/* Study Modal Header */
+.study-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--secondary-color);
+}
+
+.study-deck-name {
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--accent-color);
+}
+
+.study-progress {
+    font-size: 14px;
+    color: #999;
+    background: var(--secondary-color);
+    padding: 5px 10px;
+    border-radius: 15px;
+}
+
+/* Study Actions */
+.study-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.study-knowledge-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.knowledge-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.knowledge-btn.wrong {
+    background: #ffe4ec;
+    color: #ff6b6b;
+}
+
+.knowledge-btn.correct {
+    background: #e4ffe6;
+    color: #06d6a0;
+}
+
+.knowledge-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.study-modal-content {
+    max-width: 400px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+/* Card Modal Specific */
+#card-modal .modal-content,
+#deck-modal .modal-content {
+    max-width: 350px;
+}
+
+#card-front,
+#card-back,
+#deck-description {
+    resize: vertical;
+    min-height: 80px;
+    max-height: 200px;
+}
+
+/* Responsive adjustments for flashcards */
+@media (max-width: 390px) {
+    .flashcard-container {
+        height: 180px;
+    }
+    
+    .card-content {
+        font-size: 14px;
+        max-height: 100px;
+    }
+    
+    .study-actions {
+        flex-wrap: wrap;
+    }
+    
+    .study-actions .btn {
+        flex: none;
+        width: calc(33.333% - 7px);
+        font-size: 12px;
+        padding: 8px 5px;
+    }
+    
+    .study-knowledge-buttons {
+        flex-direction: column;
+    }
+    
+    .knowledge-btn {
+        font-size: 12px;
+        padding: 10px;
+    }
+    
+    .deck-card {
+        padding: 12px;
+    }
+    
+    .deck-name {
+        font-size: 14px;
+    }
+    
+    .deck-subject {
+        font-size: 10px;
+        padding: 2px 6px;
+    }
+    
+    .deck-progress {
+        font-size: 11px;
+        padding: 2px 6px;
+    }
+    
+    .deck-stats {
+        gap: 8px;
+        font-size: 10px;
+    }
+    
+    .deck-stat-detail {
+        font-size: 9px;
+        padding: 1px 4px;
+    }
+    
+    .deck-actions {
+        gap: 6px;
+        margin-top: 12px;
+    }
+    
+    .deck-btn {
+        padding: 6px;
+        font-size: 10px;
+        min-width: 60px;
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 320px) {
+    .deck-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .deck-progress {
+        align-self: flex-start;
+    }
+    
+    .deck-actions {
+        flex-direction: column;
+    }
+    
+    .deck-btn {
+        width: 100%;
+    }
+    
+    .study-actions .btn {
+        width: calc(50% - 5px);
+        margin-bottom: 5px;
+    }
+    
+    .flashcard-container {
+        height: 160px;
+    }
+    
+    .card-content {
+        font-size: 13px;
+    }
+}
+
+/* Fix for schedule view */
+#monthly-calendar {
+    max-width: 100%;
+    overflow: hidden;
 }
