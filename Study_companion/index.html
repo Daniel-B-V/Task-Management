@@ -33,38 +33,52 @@
     
     <!-- Sticky Navigation Bar -->
     <nav class="sticky-nav">
-    <div class="nav-content">
-        <div class="timer-quick-access" onclick="openTimerModal()">
-            ⏰ <span id="quick-timer">25:00</span> <!-- This ID is important -->
+        <div class="nav-content">
+            <div class="timer-quick-access" onclick="openTimerModal()">
+                ⏰ <span id="quick-timer">25:00</span>
+            </div>
+            <div class="nav-title">Study Companion</div>
+            <div class="hearts-display">
+                ❤️ <span id="hearts-count">0</span>
+            </div>
         </div>
-        <div class="nav-title">Study Companion</div>
-        <div class="hearts-display">
-            ❤️ <span id="hearts-count">0</span> <!-- This ID is important -->
-        </div>
-    </div>
-</nav>
+    </nav>
 
-    <!-- Study Timer Modal -->
+    <!-- Timer Modal -->
     <div id="timer-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">Study Timer ⏰</div>
+
+            <div class="saved-timers-section">
+                <!-- Saved timers will be rendered here by JavaScript -->
+            </div>
+            <!-- Timer Inputs -->
+            <div class="timer-inputs">
+                <div class="form-group">
+                    <label>Minutes</label>
+                    <input type="number" id="timer-minutes-input" min="1" max="120" value="25">
+                </div>
+                <div class="form-group">
+                    <label>Seconds</label>
+                    <input type="number" id="timer-seconds-input" min="0" max="59" value="0">
+                </div>
+            </div>
+            
+            <!-- Timer Display -->
             <div class="timer-display">
                 <div id="timer-minutes">25</div>
                 <div>:</div>
                 <div id="timer-seconds">00</div>
             </div>
+            
             <div class="timer-mode">
                 Current Mode: <span id="current-mode">Focus</span>
             </div>
+            
             <div class="timer-actions">
                 <button class="btn btn-secondary" onclick="stopTimer()">Stop</button>
                 <button class="btn btn-primary" onclick="startTimer()" id="timer-start-btn">Start</button>
                 <button class="btn btn-secondary" onclick="resetTimer()">Reset</button>
-            </div>
-            <div class="timer-presets">
-                <button class="timer-preset" onclick="setTimer(25, 'Focus')">25 min Focus</button>
-                <button class="timer-preset" onclick="setTimer(5, 'Break')">5 min Break</button>
-                <button class="timer-preset" onclick="setTimer(10, 'Long Break')">10 min Break</button>
             </div>
         </div>
     </div>
@@ -154,8 +168,10 @@
         <div class="tabs">
             <button class="tab active" data-view="tasks">Tasks 📝</button>
             <button class="tab" data-view="schedule">Schedule 📅</button>
+            <button class="tab" data-view="flashcards">Flashcards 🎴</button>
             <button class="tab" data-view="rewards">Rewards 🎁</button>
             <button class="tab" data-view="stats">Stats 📊</button>
+            
         </div>
 
         <div id="tasks-view" class="view active">
@@ -171,6 +187,12 @@
                 <button class="nav-btn next-month" onclick="changeMonth(1)">▶</button>
             </div>
             <div id="monthly-calendar"></div>
+        </div>
+
+        <div id="flashcards-view" class="view">
+            <div class="section-title">🎴 Flashcard Decks</div>
+            <button class="add-task-btn" onclick="openDeckModal()">+ Create New Deck</button>
+            <div id="decks-container"></div>
         </div>
 
         <div id="rewards-view" class="view">
@@ -285,6 +307,121 @@
             </div>
         </div>
     </div>
+
+    <!-- Deck Modal -->
+<div id="deck-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header" id="deck-modal-title">Create New Deck</div>
+        <form id="deck-form">
+            <div class="form-group">
+                <label>Deck Name</label>
+                <input type="text" id="deck-name" required placeholder="e.g., Spanish Vocabulary, Math Formulas">
+            </div>
+            <div class="form-group">
+                <label>Subject</label>
+                <div class="subject-selector">
+                    <select id="deck-subject" required>
+                        <option value="">Select subject...</option>
+                        <option value="Math">Math 📐</option>
+                        <option value="Science">Science 🔬</option>
+                        <option value="History">AP 📜</option>
+                        <option value="Language">English 🗣️</option>
+                        <option value="Art">MAPEH 🎨</option>
+                        <option value="Other">Other 📝</option>
+                    </select>
+                    <button type="button" class="add-subject-btn deck-add-subject-btn" onclick="showAddSubjectForDeck()">+ Add New</button>
+                </div>
+                <div id="deck-add-subject-input" style="display: none; margin-top: 10px;">
+                    <input type="text" id="deck-new-subject" placeholder="Enter new subject name">
+                    <button type="button" class="btn btn-primary" onclick="addNewSubjectForDeck()" style="margin-top: 5px;">Add Subject</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Description (Optional)</label>
+                <textarea id="deck-description" rows="3" placeholder="What's this deck about?"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeDeckModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Deck</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+    <!-- Card Modal -->
+    <div id="card-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" id="card-modal-title">Add Flashcard</div>
+            <form id="card-form">
+                <div class="form-group">
+                    <label>Front (Question/Term)</label>
+                    <textarea id="card-front" required rows="3" placeholder="Enter the question or term"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Back (Answer/Definition)</label>
+                    <textarea id="card-back" required rows="3" placeholder="Enter the answer or definition"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeCardModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Card</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Study Modal -->
+    <div id="study-modal" class="modal">
+        <div class="modal-content study-modal-content">
+            <div class="study-header">
+                <div class="study-deck-name" id="study-deck-name"></div>
+                <div class="study-progress">
+                    <span id="current-card-number">1</span> / <span id="total-cards">0</span>
+                </div>
+            </div>
+            <div class="flashcard-container">
+                <div class="flashcard" id="flashcard" onclick="flipCard()">
+                    <div class="flashcard-inner">
+                        <div class="flashcard-front">
+                            <div class="card-label">Question</div>
+                            <div class="card-content" id="card-front-content"></div>
+                        </div>
+                        <div class="flashcard-back">
+                            <div class="card-label">Answer</div>
+                            <div class="card-content" id="card-back-content"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flip-hint">Tap to flip</div>
+            </div>
+            <div class="study-actions">
+                <button class="btn btn-secondary" onclick="previousCard()">← Previous</button>
+                <button class="btn btn-secondary" onclick="shuffleCards()">🔀 Shuffle</button>
+                <button class="btn btn-secondary" onclick="nextCard()">Next →</button>
+            </div>
+            <div class="study-knowledge-buttons">
+                <button class="knowledge-btn wrong" onclick="markCard('wrong')">❌ Don't Know</button>
+                <button class="knowledge-btn correct" onclick="markCard('correct')">✅ Know It!</button>
+            </div>
+            <button class="btn btn-primary" onclick="closeStudyModal()" style="margin-top: 15px; width: 100%;">Finish Studying</button>
+        </div>
+    </div>
+
+    <!-- Delete Deck Confirmation Modal -->
+    <div id="delete-deck-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" style="color: #ff6b9d;">⚠️ Delete Deck</div>
+            <div class="delete-message-content">
+                <div class="delete-emoji">🥺</div>
+                <p id="delete-deck-message-text">Are you sure you want to delete this deck and all its cards?</p>
+                <p class="delete-task-name" id="delete-deck-name"></p>
+                <div class="delete-modal-actions">
+                    <button class="btn btn-secondary" onclick="closeDeleteDeckModal()">Cancel</button>
+                    <button class="btn btn-delete" onclick="confirmDeleteDeck()">Delete Deck</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
 
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
